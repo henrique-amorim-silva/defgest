@@ -15,14 +15,17 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab }) => 
     { id: 'agrofit', label: 'Consulta Agrofit', icon: Database },
   ];
 
+  // Usa o BASE_URL configurado no vite.config.ts para achar a pasta public corretamente
+  const logoSrc = `${import.meta.env.BASE_URL}images/nav-logo.png`;
+
   return (
-    <header className="bg-white text-gray-800 shadow-sm border-b border-gray-200">
+    <header className="bg-emerald-50/70 backdrop-blur-md text-gray-800 shadow-sm border-b border-emerald-200/60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo DefGest com fundo claro */}
+          {/* Logo DefGest */}
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setCurrentTab('dashboard')}>
             <img 
-              src="/images/nav-logo.png" 
+              src={logoSrc} 
               alt="DefGest Logo" 
               className="h-9 w-auto object-contain" 
             />
@@ -40,7 +43,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab }) => 
                   className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     isActive
                       ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'text-gray-600 hover:bg-emerald-50 hover:text-emerald-700'
+                      : 'text-gray-700 hover:bg-emerald-100/70 hover:text-emerald-900'
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -53,7 +56,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab }) => 
       </div>
 
       {/* Menu mobile simplificado */}
-      <div className="md:hidden flex justify-around bg-gray-50 border-t border-gray-200 p-2">
+      <div className="md:hidden flex justify-around bg-emerald-100/40 border-t border-emerald-200/60 p-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentTab === item.id;
@@ -62,7 +65,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab }) => 
               key={item.id}
               onClick={() => setCurrentTab(item.id)}
               className={`p-2 rounded-md ${
-                isActive ? 'bg-emerald-600 text-white' : 'text-gray-600 hover:bg-gray-200'
+                isActive ? 'bg-emerald-600 text-white' : 'text-gray-700 hover:bg-emerald-200/50'
               }`}
               title={item.label}
             >
