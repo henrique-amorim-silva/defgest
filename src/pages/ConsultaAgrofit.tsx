@@ -1,16 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { sincronizarCatalogoAgrofit } from '../services/agrofitApi';
-import type { ProdutoAgrofitCompleto } from '../services/agrofitApi';
-import { Search, Database, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { sincronizarCatalogoAgrofit } from "../services/agrofitApi";
+import type { ProdutoAgrofitCompleto } from "../services/agrofitApi";
+import {
+  Search,
+  Database,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+} from "lucide-react";
 
 export const ConsultaAgrofit: React.FC = () => {
   const [produtos, setProdutos] = useState<ProdutoAgrofitCompleto[]>([]);
-  const [termo, setTermo] = useState('');
+  const [termo, setTermo] = useState("");
   const [carregando, setCarregando] = useState(true);
 
   // Estados de Paginação configurados para 10 itens por padrão
   const [paginaAtual, setPaginaAtual] = useState(1);
-  const [itensPorPagina, setItensPorPagina] = useState<number | 'todos'>(10);
+  const [itensPorPagina, setItensPorPagina] = useState<number | "todos">(10);
 
   useEffect(() => {
     carregarCatalogo();
@@ -28,7 +35,7 @@ export const ConsultaAgrofit: React.FC = () => {
     (p) =>
       p.nomeComercial.toLowerCase().includes(termo.toLowerCase()) ||
       p.ingredienteAtivo.toLowerCase().includes(termo.toLowerCase()) ||
-      p.registro.includes(termo)
+      p.registro.includes(termo),
   );
 
   const handleMudancaTermo = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -36,32 +43,44 @@ export const ConsultaAgrofit: React.FC = () => {
     setPaginaAtual(1);
   };
 
-  const handleMudancaItensPorPagina = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleMudancaItensPorPagina = (
+    e: React.ChangeEvent<HTMLSelectElement>,
+  ) => {
     const valor = e.target.value;
-    setItensPorPagina(valor === 'todos' ? 'todos' : Number(valor));
+    setItensPorPagina(valor === "todos" ? "todos" : Number(valor));
     setPaginaAtual(1);
   };
 
-  // Lógica de Paginação (renderiza apenas o lote necessário)
+  // Lógica de Paginação
   const totalRegistros = produtosFiltrados.length;
-  const totalPaginas = itensPorPagina === 'todos' ? 1 : Math.ceil(totalRegistros / Number(itensPorPagina));
+  const totalPaginas =
+    itensPorPagina === "todos"
+      ? 1
+      : Math.ceil(totalRegistros / Number(itensPorPagina));
 
-  const indiceInicial = itensPorPagina === 'todos' ? 0 : (paginaAtual - 1) * Number(itensPorPagina);
-  const indiceFinal = itensPorPagina === 'todos' ? totalRegistros : indiceInicial + Number(itensPorPagina);
-  
+  const indiceInicial =
+    itensPorPagina === "todos" ? 0 : (paginaAtual - 1) * Number(itensPorPagina);
+  const indiceFinal =
+    itensPorPagina === "todos"
+      ? totalRegistros
+      : indiceInicial + Number(itensPorPagina);
+
   const produtosPaginados = produtosFiltrados.slice(indiceInicial, indiceFinal);
 
   return (
     <div className="max-w-[95%] mx-auto py-8 px-4">
       <div className="bg-white rounded-xl shadow-md overflow-hidden p-6 border border-emerald-100">
-        
         {/* Cabeçalho */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 border-b pb-4 gap-4">
           <div className="flex items-center space-x-3">
             <Database className="h-7 w-7 text-emerald-600" />
             <div>
-              <h2 className="text-xl font-bold text-gray-800">Catálogo Nacional - Agrofit (MAPA)</h2>
-              <p className="text-sm text-gray-500">Base completa otimizada para consulta rápida.</p>
+              <h2 className="text-xl font-bold text-gray-800">
+                Catálogo Nacional - Agrofit (MAPA)
+              </h2>
+              <p className="text-sm text-gray-500">
+                Base completa otimizada para consulta rápida.
+              </p>
             </div>
           </div>
 
@@ -88,65 +107,126 @@ export const ConsultaAgrofit: React.FC = () => {
 
         {/* Tabela */}
         {carregando ? (
-          <div className="text-center py-12 text-gray-500">Carregando catálogo...</div>
+          <div className="text-center py-12 text-gray-500">
+            Carregando catálogo...
+          </div>
         ) : produtosFiltrados.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">Nenhum agrotóxico encontrado.</div>
+          <div className="text-center py-12 text-gray-500">
+            Nenhum agrotóxico encontrado.
+          </div>
         ) : (
           <>
             <div className="overflow-x-auto shadow-inner rounded-lg border border-gray-200">
               <table className="min-w-full divide-y divide-gray-200 bg-white">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Registro</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Nome Comercial</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Titular</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Ingrediente Ativo</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Formulação / Grupo</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Classe Toxicológica</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Cultura / Praga</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Unidade</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                      Registro
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                      Nome Comercial
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                      Titular
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                      Ingrediente Ativo
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                      Formulação / Grupo
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                      Classe Toxicológica
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                      Cultura / Praga
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                      Unidade
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">
+                      Bula
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {produtosPaginados.map((p) => (
-                    <tr key={p.id} className="hover:bg-emerald-50/50 transition">
-                      <td className="px-4 py-4 whitespace-nowrap text-sm font-mono font-medium text-emerald-800">
-                        {p.registro}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                        {p.nomeComercial}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {p.titularRegistro}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800 font-medium">
-                        {p.ingredienteAtivo}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
-                        <div className="text-xs font-semibold text-gray-800">{p.formulacao}</div>
-                        <div className="text-xs text-gray-500">{p.grupoQuimico}</div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm">
-                        <span className="px-2.5 py-1 text-xs font-medium bg-amber-50 text-amber-900 rounded-full border border-amber-200">
-                          {p.classeToxicologica}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
-                        <div className="font-medium text-gray-900">{p.cultura}</div>
-                        <div className="text-xs text-gray-500">Alvo: {p.praga}</div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-700">
-                        {p.unidadePadrao}
-                      </td>
-                    </tr>
-                  ))}
+                  {produtosPaginados.map((p) => {
+                    // Localiza o documento do tipo 'Bula' dentro do array vindouro do JSON
+                    const docBula = p.documentosCadastrados?.find(
+                      (doc) =>
+                        doc.tipo_documento &&
+                        doc.tipo_documento.toLowerCase().includes("bula"),
+                    );
+
+                    return (
+                      <tr
+                        key={p.id}
+                        className="hover:bg-emerald-50/50 transition"
+                      >
+                        <td className="px-4 py-4 whitespace-nowrap text-sm font-mono font-medium text-emerald-800">
+                          {p.registro}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                          {p.nomeComercial}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {p.titularRegistro}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800 font-medium">
+                          {p.ingredienteAtivo}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                          <div className="text-xs font-semibold text-gray-800">
+                            {p.formulacao}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {p.grupoQuimico}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm">
+                          <span className="px-2.5 py-1 text-xs font-medium bg-amber-50 text-amber-900 rounded-full border border-amber-200">
+                            {p.classeToxicologica}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                          <div className="font-medium text-gray-900">
+                            {p.cultura}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Alvo: {p.praga}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-700">
+                          {p.unidadePadrao}
+                        </td>
+                        {/* Nova Coluna com o Botão da Bula */}
+                        <td className="px-4 py-4 whitespace-nowrap text-center text-sm">
+                          {docBula && docBula.url ? (
+                            <a
+                              href={docBula.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-md shadow-sm transition"
+                              title="Visualizar Bula"
+                            >
+                              <FileText className="h-4 w-4" />
+                              Ver Bula
+                            </a>
+                          ) : (
+                            <span className="text-xs text-gray-400 italic">
+                              Indisponível
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
             {/* Rodapé de Paginação */}
             <div className="flex flex-col sm:flex-row items-center justify-between mt-4 pt-4 border-t border-gray-200 gap-4 text-sm text-gray-600">
-              
               <div className="flex items-center space-x-2">
                 <span>Mostrar:</span>
                 <select
@@ -163,13 +243,17 @@ export const ConsultaAgrofit: React.FC = () => {
               </div>
 
               <div>
-                Mostrando {totalRegistros === 0 ? 0 : indiceInicial + 1} a {Math.min(indiceFinal, totalRegistros)} de {totalRegistros} registros filtrados
+                Mostrando {totalRegistros === 0 ? 0 : indiceInicial + 1} a{" "}
+                {Math.min(indiceFinal, totalRegistros)} de {totalRegistros}{" "}
+                registros filtrados
               </div>
 
-              {itensPorPagina !== 'todos' && totalPaginas > 1 && (
+              {itensPorPagina !== "todos" && totalPaginas > 1 && (
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
+                    onClick={() =>
+                      setPaginaAtual((prev) => Math.max(prev - 1, 1))
+                    }
                     disabled={paginaAtual === 1}
                     className="p-2 border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
                   >
@@ -179,7 +263,9 @@ export const ConsultaAgrofit: React.FC = () => {
                     Página {paginaAtual} de {totalPaginas}
                   </span>
                   <button
-                    onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))}
+                    onClick={() =>
+                      setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))
+                    }
                     disabled={paginaAtual === totalPaginas}
                     className="p-2 border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
                   >
