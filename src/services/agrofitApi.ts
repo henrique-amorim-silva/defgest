@@ -1,3 +1,10 @@
+// agrofitApi.ts
+
+export interface IndicacaoUsoAgrofit {
+  cultura: string;
+  praga: string;
+}
+
 export interface DocumentoAgrofit {
   descricao?: string;
   tipo_documento?: string;
@@ -15,15 +22,15 @@ export interface ProdutoAgrofitCompleto {
   formulacao: string;
   grupoQuimico: string;
   classeToxicologica: string;
-  cultura: string;
-  praga: string;
+  cultura: string; // Mantido para retrocompatibilidade ou busca rápida
+  praga: string;   // Mantido para retrocompatibilidade ou busca rápida
+  indicacoesUso: IndicacaoUsoAgrofit[]; // <--- Nova lista completa
   unidadePadrao: string;
   documentosCadastrados?: DocumentoAgrofit[];
 }
 
 export async function sincronizarCatalogoAgrofit(): Promise<ProdutoAgrofitCompleto[]> {
   try {
-    // Carrega diretamente do arquivo JSON estático hospedado no projeto
     const resposta = await fetch(`${import.meta.env.BASE_URL}agrofit_base_completa.json`);
     if (!resposta.ok) {
       throw new Error("Não foi possível carregar a base de dados.");
@@ -37,7 +44,21 @@ export async function sincronizarCatalogoAgrofit(): Promise<ProdutoAgrofitComple
 
     const produtosMapeados: ProdutoAgrofitCompleto[] = dadosBrutos.map((item: any, index: number) => {
       const primeiroAtivo = item.ingrediente_ativo_detalhado?.[0];
-      const primeiraIndicacao = item.indicacao_uso?.[0];
+      
+      // Mapeia todas as indicações de uso do JSON
+      const indicacoesMapeadas: IndicacaoUsoAgrofit[] = Array.isArray(item.indicacao_uso)
+        ? item.indicacao_uso.map((ind: any) => {
+            const pragaNome = Array.isArray(ind.praga_nome_comum)
+              ? ind.praga_nome_comum.join(", ")
+              : ind.praga_nome_comum || ind.praga_nome_cientifico || "Não especificado";
+            return {
+              cultura: ind.cultura || "Geral",
+              praga: pragaNome,
+            };
+          })
+        : [];
+
+      const primeiraIndicacao = indicacoesMapeadas[0] || { cultura: "", praga: "" };
 
       const documentosOtimizados = Array.isArray(item.documento_cadastrado)
         ? item.documento_cadastrado.map((doc: any) => ({
@@ -59,10 +80,9 @@ export async function sincronizarCatalogoAgrofit(): Promise<ProdutoAgrofitComple
         formulacao: item.formulacao || "",
         grupoQuimico: primeiroAtivo?.grupo_quimico || "",
         classeToxicologica: item.classificacao_toxicologica || "",
-        cultura: primeiraIndicacao?.cultura || "",
-        praga: Array.isArray(primeiraIndicacao?.praga_nome_comum)
-          ? primeiraIndicacao.praga_nome_comum[0]
-          : primeiraIndicacao?.praga_nome_comum || "",
+        cultura: primeiraIndicacao.cultura,
+        praga: primeiraIndicacao.praga,
+        indicacoesUso: indicacoesMapeadas, // <--- Atribui o array completo
         unidadePadrao: primeiroAtivo?.unidade_medida || "Litros (L)",
         documentosCadastrados: documentosOtimizados,
       };
@@ -72,26 +92,6 @@ export async function sincronizarCatalogoAgrofit(): Promise<ProdutoAgrofitComple
 
   } catch (erro) {
     console.error("Erro ao processar a base local do Agrofit:", erro);
-    
-    return [
-      {
-        id: "1",
-        registro: "00198",
-        nomeComercial: "Glifosato Master",
-        titularRegistro: "Indústria Química Brasileira",
-        ingredienteAtivo: "Glifosato",
-        formulacao: "Concentrado Solúvel (SL)",
-        grupoQuimico: "Glicina Substituída",
-        classeToxicologica: "Categoria 5",
-        cultura: "Soja e Milho",
-        praga: "Plantas Daninhas",
-        unidadePadrao: "Litros (L)",
-        documentosCadastrados: [],
-      },
-    ];
+    return [];
   }
-}
-
-export async function forcarAtualizacaoAgrofit(): Promise<ProdutoAgrofitCompleto[]> {
-  return await sincronizarCatalogoAgrofit();
 }

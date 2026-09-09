@@ -8,12 +8,17 @@ import {
   ChevronLeft,
   ChevronRight,
   FileText,
+  Eye,
+  X,
 } from "lucide-react";
 
 export const ConsultaAgrofit: React.FC = () => {
   const [produtos, setProdutos] = useState<ProdutoAgrofitCompleto[]>([]);
   const [termo, setTermo] = useState("");
   const [carregando, setCarregando] = useState(true);
+
+  // Estado para controlar o modal de visualização de todas as correlações
+  const [produtoModal, setProdutoModal] = useState<ProdutoAgrofitCompleto | null>(null);
 
   // Estados de Paginação configurados para 10 itens por padrão
   const [paginaAtual, setPaginaAtual] = useState(1);
@@ -188,18 +193,31 @@ export const ConsultaAgrofit: React.FC = () => {
                             {p.classeToxicologica}
                           </span>
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                        <td className="px-4 py-4 text-sm text-gray-600">
                           <div className="font-medium text-gray-900">
-                            {p.cultura}
+                            {p.cultura}{" "}
+                            {p.indicacoesUso.length > 1 && (
+                              <span className="text-xs text-emerald-600 font-normal">
+                                (+{p.indicacoesUso.length - 1} outras)
+                              </span>
+                            )}
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-gray-500 truncate max-w-xs">
                             Alvo: {p.praga}
                           </div>
+                          {p.indicacoesUso.length > 0 && (
+                            <button
+                              onClick={() => setProdutoModal(p)}
+                              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-800 transition"
+                            >
+                              <Eye className="h-3 w-3" /> Ver todas as correlações ({p.indicacoesUso.length})
+                            </button>
+                          )}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-700">
                           {p.unidadePadrao}
                         </td>
-                        {/* Nova Coluna com o Botão da Bula */}
+                        {/* Nova Coluna com o Botão da Bula otimizado para Visualização */}
                         <td className="px-4 py-4 whitespace-nowrap text-center text-sm">
                           {docBula && docBula.url ? (
                             <a
@@ -277,6 +295,66 @@ export const ConsultaAgrofit: React.FC = () => {
           </>
         )}
       </div>
+
+      {/* Modal para exibir a lista completa de Culturas e Pragas */}
+      {produtoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col overflow-hidden">
+            {/* Cabeçalho do Modal */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">
+                  {produtoModal.nomeComercial}
+                </h3>
+                <p className="text-xs text-gray-500 font-mono">
+                  Registro MAPA: {produtoModal.registro} | Ingrediente Ativo: {produtoModal.ingredienteAtivo}
+                </p>
+              </div>
+              <button
+                onClick={() => setProdutoModal(null)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-full transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Conteúdo da Tabela do Modal */}
+            <div className="p-6 overflow-y-auto flex-1">
+              <p className="text-sm font-semibold text-gray-700 mb-3">
+                Relação Completa de Culturas e Pragas Alvo Autorizadas:
+              </p>
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left font-semibold text-gray-600 text-xs">Cultura</th>
+                      <th className="px-4 py-2 text-left font-semibold text-gray-600 text-xs">Praga / Alvo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {produtoModal.indicacoesUso.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 font-medium text-gray-900">{item.cultura}</td>
+                        <td className="px-4 py-2 text-gray-600">{item.praga}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Rodapé do Modal */}
+            <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex justify-end">
+              <button
+                onClick={() => setProdutoModal(null)}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-medium rounded-md transition"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
