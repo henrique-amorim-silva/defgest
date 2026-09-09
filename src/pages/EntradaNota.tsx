@@ -168,7 +168,7 @@ export const EntradaNota: React.FC = () => {
 
     const catalogo = await sincronizarCatalogoAgrofit();
 
-    const itensTempCarregados: ItemNotaTemporario[] = itensDaNota.map((item) => {
+   const itensTempCarregados: ItemNotaTemporario[] = itensDaNota.map((item) => {
       const prodEncontrado = catalogo.find(p => p.id === item.produtoId) || {
         id: item.produtoId,
         registro: "",
@@ -180,6 +180,7 @@ export const EntradaNota: React.FC = () => {
         classeToxicologica: "",
         cultura: "",
         praga: "",
+        indicacoesUso: [], // <--- Adicionado para satisfazer a interface
         unidadePadrao: item.unidade,
       };
 
