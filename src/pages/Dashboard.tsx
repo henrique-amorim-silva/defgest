@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getStorageData } from '../utils/storage';
 import type { ItemEstoque } from '../@types/estoque';
-import type { ReceitaAgronomica } from '../@types/receita';
-import { LayoutDashboard, Package, FileText, AlertTriangle, CheckCircle, ArrowUpRight } from 'lucide-react';
+import { LayoutDashboard, Package, AlertTriangle, CheckCircle, ArrowUpRight } from 'lucide-react';
 
 interface DashboardProps {
   setCurrentTab: (tab: string) => void;
@@ -12,11 +11,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab }) => {
   const [totalProdutos, setTotalProdutos] = useState(0);
   const [totalLotes, setTotalLotes] = useState(0);
   const [alertasVencimento, setAlertasVencimento] = useState<ItemEstoque[]>([]);
-  const [totalReceitas, setTotalReceitas] = useState(0);
 
   useEffect(() => {
     const estoque = getStorageData<ItemEstoque>('estoque');
-    const receitas = getStorageData<ReceitaAgronomica>('receitas'); // Opcional caso salve no futuro
 
     setTotalLotes(estoque.length);
     

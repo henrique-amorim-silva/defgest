@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getStorageData } from '../utils/storage';
 import type { ItemEstoque } from '../@types/estoque';
-import { Package, Search, AlertTriangle, Calendar, Layers } from 'lucide-react';
+import { Package, Search, Calendar, Layers } from 'lucide-react';
 
 export const Estoque: React.FC = () => {
   const [estoque, setEstoque] = useState<ItemEstoque[]>([]);
