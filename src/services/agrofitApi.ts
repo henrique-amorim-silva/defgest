@@ -14,7 +14,7 @@ export interface ProdutoAgrofitCompleto {
 
 const CACHE_KEY = "toximanager_agrofit_catalogo_global";
 const VERSAO_KEY = "toximanager_agrofit_versao";
-const VERSAO_BASE = "1"; 
+const VERSAO_BASE = "2"; // Incrementado para forçar a atualização do cache antigo
 
 export async function sincronizarCatalogoAgrofit(): Promise<ProdutoAgrofitCompleto[]> {
   try {
@@ -29,8 +29,8 @@ export async function sincronizarCatalogoAgrofit(): Promise<ProdutoAgrofitComple
       }
     }
 
-    // Carrega o arquivo JSON sob demanda da pasta public (evita travar o bundle inicial)
-    const resposta = await fetch('/agrofit_base_completa.json');
+    // Carrega o arquivo JSON sob demanda considerando o BASE_URL do Vite para o GitHub Pages
+    const resposta = await fetch(`${import.meta.env.BASE_URL}agrofit_base_completa.json`);
     if (!resposta.ok) {
       throw new Error("Não foi possível carregar a base de dados.");
     }
