@@ -12,6 +12,7 @@ import { LogOut } from "lucide-react";
 export function App() {
   const [currentTab, setCurrentTab] = useState("dashboard");
   const [token, setToken] = useState<string | null>(null);
+  const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("");
 
   useEffect(() => {
     const salvo = localStorage.getItem("token");
@@ -24,6 +25,7 @@ export function App() {
     localStorage.removeItem("token");
     localStorage.removeItem("usuario");
     setToken(null);
+    setEmpresaSelecionada("");
   };
 
   if (!token) {
@@ -33,19 +35,19 @@ export function App() {
   const renderScreen = () => {
     switch (currentTab) {
       case "dashboard":
-        return <Dashboard setCurrentTab={setCurrentTab} />;
+        return <Dashboard setCurrentTab={setCurrentTab} empresaSelecionada={empresaSelecionada} />;
       case "estoque":
-        return <Estoque />;
+        return <Estoque empresaSelecionada={empresaSelecionada} />;
       case "entrada":
-        return <EntradaNota />;
+        return <EntradaNota empresaSelecionada={empresaSelecionada} />;
       case "receita":
         return <EmissaoReceita />;
       case "agrofit":
         return <ConsultaAgrofit />;
       case "admin_usuarios":
-        return <GerenciamentoUsuarios />;
+        return <GerenciamentoUsuarios  />;
       default:
-        return <Dashboard setCurrentTab={setCurrentTab} />;
+        return <Dashboard setCurrentTab={setCurrentTab} empresaSelecionada={empresaSelecionada} />;
     }
   };
 
@@ -61,7 +63,12 @@ export function App() {
         </button>
       </div>
 
-      <Navbar currentTab={currentTab} setCurrentTab={setCurrentTab} />
+      <Navbar 
+        currentTab={currentTab} 
+        setCurrentTab={setCurrentTab} 
+        empresaSelecionada={empresaSelecionada}
+        setEmpresaSelecionada={setEmpresaSelecionada}
+      />
       <main className="flex-1">{renderScreen()}</main>
       <footer className="bg-white border-t border-gray-200 py-4 text-center text-xs text-gray-500">
         DEFGEST &copy; 2026 - Sistema de Controle de Estoque e Receituário Agronômico[cite: 5]

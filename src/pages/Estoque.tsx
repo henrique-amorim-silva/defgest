@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { getStorageData } from '../utils/storage';
 import type { ItemEstoque } from '../@types/estoque';
 import { Package, Search, Calendar, Layers, Filter, AlertTriangle, CheckCircle, BarChart2 } from 'lucide-react';
 
-export const Estoque: React.FC = () => {
+interface EstoqueProps {
+  empresaSelecionada?: string;
+}
+
+export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada }) => {
   const [estoque, setEstoque] = useState<ItemEstoque[]>([]);
   
   // Estados de Filtros Avançados
@@ -16,10 +19,33 @@ export const Estoque: React.FC = () => {
   // Controle de aba de visualização (Lotes detalhados vs Resumo Consolidado para Compra)
   const [abaVisualizacao, setAbaVisualizacao] = useState<'lotes' | 'consolidado'>('lotes');
 
+  // Carregar dados da API do Backend respeitando a empresa selecionada
   useEffect(() => {
-    const dadosEstoque = getStorageData<ItemEstoque>('estoque');
-    setEstoque(dadosEstoque);
-  }, []);
+    const buscarEstoque = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const url = empresaSelecionada 
+          ? `http://localhost:3001/api/estoque?empresaId=${empresaSelecionada}`
+          : 'http://localhost:3001/api/estoque';
+
+        const response = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          const dados = await response.json();
+          setEstoque(dados);
+        } else {
+          console.error('Erro ao carregar o estoque do servidor.');
+        }
+      } catch (error) {
+        console.error('Erro de conexão com o servidor:', error);
+      }
+    };
+
+    buscarEstoque();
+  }, [empresaSelecionada]);
 
   // Função auxiliar para checar se o lote está vencido
   const isVencido = (dataValidade: string) => {
@@ -32,7 +58,7 @@ export const Estoque: React.FC = () => {
   const estoqueFiltrado = estoque.filter((item) => {
     const matchProduto = item.nomeProduto.toLowerCase().includes(buscaProduto.toLowerCase());
     const matchLote = item.lote.toLowerCase().includes(buscaLote.toLowerCase());
-    const matchNf = item.numeroNotaFiscal.toLowerCase().includes(buscaNf.toLowerCase());
+    const matchNf = (item.numeroNotaFiscal || '').toLowerCase().includes(buscaNf.toLowerCase());
     
     let matchValidade = true;
     const vencido = isVencido(item.dataValidade);
@@ -308,7 +334,7 @@ export const Estoque: React.FC = () => {
                             </div>
                           </td>
                           <td className="px-6 py-4 text-gray-600 font-mono text-xs">
-                            NF-{item.numeroNotaFiscal}
+                            {item.numeroNotaFiscal ? `NF-${item.numeroNotaFiscal}` : '-'}
                           </td>
                           <td className="px-6 py-4 text-gray-500 text-xs">
                             {item.dataEntrada}

@@ -1,38 +1,74 @@
 import React, { useState, useEffect } from 'react';
-import { getStorageData } from '../utils/storage';
-import type { ItemEstoque } from '../@types/estoque';
-import { LayoutDashboard, Package, AlertTriangle, CheckCircle, ArrowUpRight } from 'lucide-react';
+import { listarEstoque, type ItemEstoque } from '../services/estoqueApi';
+import { LayoutDashboard, Package, AlertTriangle, CheckCircle, ArrowUpRight, Loader2 } from 'lucide-react';
 
 interface DashboardProps {
   setCurrentTab: (tab: string) => void;
+  empresaSelecionada: string;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, empresaSelecionada }) => {
   const [totalProdutos, setTotalProdutos] = useState(0);
   const [totalLotes, setTotalLotes] = useState(0);
   const [alertasVencimento, setAlertasVencimento] = useState<ItemEstoque[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
-    const estoque = getStorageData<ItemEstoque>('estoque');
+    async function carregarDadosDashboard() {
+      try {
+        setCarregando(true);
+        setErro(null);
 
-    setTotalLotes(estoque.length);
-    
-    // Soma produtos únicos ou quantidade total
-    const produtosUnicos = new Set(estoque.map((i) => i.produtoId)).size;
-    setTotalProdutos(produtosUnicos);
+        // Busca o estoque real do backend filtrando pela empresa selecionada (se houver)
+        const estoque = await listarEstoque(empresaSelecionada);
 
-    // Identificar lotes vencendo nos próximos 30 dias ou já vencidos (exemplo simples)
-    const hoje = new Date();
-    const trintaDiasFrente = new Date();
-    trintaDiasFrente.setDate(hoje.getDate() + 30);
+        setTotalLotes(estoque.length);
+        
+        // Conta produtos únicos pelo nome do produto
+        const produtosUnicos = new Set(estoque.map((i) => i.nomeProduto)).size;
+        setTotalProdutos(produtosUnicos);
 
-    const lotesAlerta = estoque.filter((item) => {
-      const dataVal = new Date(item.dataValidade);
-      return dataVal <= trintaDiasFrente;
-    });
+        // Identificar lotes vencendo nos próximos 30 dias ou já vencidos
+        const hoje = new Date();
+        const trintaDiasFrente = new Date();
+        trintaDiasFrente.setDate(hoje.getDate() + 30);
 
-    setAlertasVencimento(lotesAlerta);
-  }, []);
+        const lotesAlerta = estoque.filter((item) => {
+          const dataVal = new Date(item.dataValidade);
+          return dataVal <= trintaDiasFrente;
+        });
+
+        setAlertasVencimento(lotesAlerta);
+      } catch (err: any) {
+        setErro(err.message || 'Erro ao carregar dados do dashboard.');
+      } finally {
+        setCarregando(false);
+      }
+    }
+
+    carregarDadosDashboard();
+  }, [empresaSelecionada]);
+
+  if (carregando) {
+    return (
+      <div className="flex justify-center items-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+        <span className="ml-2 text-gray-600 font-medium">Carregando painel...</span>
+      </div>
+    );
+  }
+
+  if (erro) {
+    return (
+      <div className="max-w-6xl mx-auto py-8 px-4">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          <p className="font-bold">Erro de Conexão</p>
+          <p className="text-sm">{erro}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto py-8 px-4">
@@ -41,7 +77,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab }) => {
         <LayoutDashboard className="h-7 w-7 text-emerald-600" />
         <div>
           <h2 className="text-xl font-bold text-gray-800">Painel Geral - DEFGEST</h2>
-          <p className="text-sm text-gray-500">Visão geral do estoque e operações de defensivos agrícolas.</p>
+          <p className="text-sm text-gray-500">Visão geral do estoque e operações de defensivos agrícolas integradas ao banco.</p>
         </div>
       </div>
 
