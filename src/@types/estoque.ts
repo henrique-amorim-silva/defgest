@@ -1,3 +1,5 @@
+// estoque.ts
+
 export interface ItemEstoque {
   id: string;
   produtoId: string;

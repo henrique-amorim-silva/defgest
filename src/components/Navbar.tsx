@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Package, FilePlus, FileText, Database } from 'lucide-react';
+import { LayoutDashboard, Package, FilePlus, FileText, Database, ShieldAlert } from 'lucide-react';
 
 interface NavbarProps {
   currentTab: string;
@@ -7,6 +7,11 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab }) => {
+  // Pega os dados do usuário salvo no localStorage para checar a permissão
+  const usuarioStr = localStorage.getItem("usuario");
+  const usuario = usuarioStr ? JSON.parse(usuarioStr) : null;
+  const isAdminMaster = usuario?.permissao === 'admin_master';
+
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'estoque', label: 'Estoque', icon: Package },
@@ -15,14 +20,17 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab }) => 
     { id: 'agrofit', label: 'Consulta Agrofit', icon: Database },
   ];
 
-  // Usa o BASE_URL configurado no vite.config.ts para achar a pasta public corretamente
+  // Se for admin_master, adiciona a aba de gerenciamento ao menu
+  if (isAdminMaster) {
+    navItems.push({ id: 'admin_usuarios', label: 'Gerenciar Empresas/Usuários', icon: ShieldAlert });
+  }
+
   const logoSrc = `${import.meta.env.BASE_URL}images/nav-logo.png`;
 
   return (
     <header className="bg-emerald-50/70 backdrop-blur-md text-gray-800 shadow-sm border-b border-emerald-200/60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo DefGest */}
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setCurrentTab('dashboard')}>
             <img 
               src={logoSrc} 
@@ -31,7 +39,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab }) => 
             />
           </div>
 
-          {/* Menu de Navegação */}
           <nav className="hidden md:flex space-x-2">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -55,7 +62,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab }) => 
         </div>
       </div>
 
-      {/* Menu mobile simplificado */}
       <div className="md:hidden flex justify-around bg-emerald-100/40 border-t border-emerald-200/60 p-2">
         {navItems.map((item) => {
           const Icon = item.icon;

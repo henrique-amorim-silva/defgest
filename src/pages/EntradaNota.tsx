@@ -122,11 +122,9 @@ export const EntradaNota: React.FC = () => {
     let novoEstoque = [...estoqueAtual];
 
     if (notaEmEdicaoId) {
-      // Se for edição, removemos primeiro os itens antigos vinculados a esta nota fiscal e adicionamos os novos
       novoEstoque = novoEstoque.filter((item) => item.numeroNotaFiscal !== numeroNota);
     }
 
-    // Criar os novos itens de estoque para cada linha informada na nota
     const novosItensEstoque: ItemEstoque[] = itensNota.map((item, index) => ({
       id: `${new Date().getTime()}-${index}`,
       produtoId: item.produto.id,
@@ -168,7 +166,7 @@ export const EntradaNota: React.FC = () => {
 
     const catalogo = await sincronizarCatalogoAgrofit();
 
-   const itensTempCarregados: ItemNotaTemporario[] = itensDaNota.map((item) => {
+    const itensTempCarregados: ItemNotaTemporario[] = itensDaNota.map((item) => {
       const prodEncontrado = catalogo.find(p => p.id === item.produtoId) || {
         id: item.produtoId,
         registro: "",
@@ -180,8 +178,17 @@ export const EntradaNota: React.FC = () => {
         classeToxicologica: "",
         cultura: "",
         praga: "",
-        indicacoesUso: [], // <--- Adicionado para satisfazer a interface
+        indicacoesUso: [],
         unidadePadrao: item.unidade,
+        modoAplicacao: "Terrestre",
+        doseMin: 0,
+        doseMax: 0,
+        doseMed: 0,
+        doseUnid: item.unidade,
+        vCaldaMin: 0,
+        vCaldaMax: 0,
+        vCaldaMed: 0,
+        vCaldaUnid: "L/ha",
       };
 
       return {
@@ -199,7 +206,6 @@ export const EntradaNota: React.FC = () => {
     setModo('formulario');
   };
 
-  // Agrupar o estoque por Nota Fiscal para exibir na listagem consolidada
   const notasAgrupadas = estoque.reduce((acc, item) => {
     const nf = item.numeroNotaFiscal || "S/N";
     if (!acc[nf]) {
@@ -215,7 +221,6 @@ export const EntradaNota: React.FC = () => {
 
   const listaNotas = Object.values(notasAgrupadas);
 
-  // 1. TELA DE FORMULÁRIO
   if (modo === 'formulario') {
     return (
       <div className="max-w-4xl mx-auto py-8 px-4">
@@ -238,7 +243,6 @@ export const EntradaNota: React.FC = () => {
           </div>
 
           <form onSubmit={handleSubmitNota} className="space-y-6">
-            {/* Cabeçalho da Nota */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-emerald-50/50 p-4 rounded-lg border border-emerald-100">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -267,14 +271,12 @@ export const EntradaNota: React.FC = () => {
               </div>
             </div>
 
-            {/* Adicionar Produtos / Lotes da Nota */}
             <div className="border border-gray-200 rounded-lg p-4 bg-gray-50/50 space-y-4">
               <h3 className="text-md font-semibold text-gray-800 flex items-center space-x-2">
                 <PackagePlus className="h-5 w-5 text-emerald-600" />
                 <span>Adicionar Produtos e Lotes à Nota</span>
               </h3>
 
-              {/* Busca Agrofit */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Buscar Produto (Base Agrofit)
@@ -328,7 +330,6 @@ export const EntradaNota: React.FC = () => {
                 )}
               </div>
 
-              {/* Detalhes do Lote, Qtd e Validade */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Lote</label>
@@ -387,12 +388,11 @@ export const EntradaNota: React.FC = () => {
               </div>
             </div>
 
-            {/* Tabela de Itens Adicionados na Nota Atual */}
             <div>
               <h4 className="text-sm font-semibold text-gray-700 mb-2">Itens Inseridos Nesta Nota ({itensNota.length})</h4>
               {itensNota.length === 0 ? (
                 <p className="text-xs text-gray-500 italic bg-gray-50 p-4 rounded-md border text-center">
-                  Nenhum item adicionado ainda. Preencha os campos acima e clique em "Incluir Lote/Produto na Nota". (Você pode adicionar vários produtos ou vários lotes do mesmo produto).
+                  Nenhum item adicionado ainda. Preencha os campos acima e clique em "Incluir Lote/Produto na Nota".
                 </p>
               ) : (
                 <div className="overflow-x-auto border rounded-md">
@@ -431,7 +431,6 @@ export const EntradaNota: React.FC = () => {
               )}
             </div>
 
-            {/* Botão Salvar Geral */}
             <div className="flex justify-end pt-4 space-x-3 border-t">
               <button
                 type="button"
@@ -453,7 +452,6 @@ export const EntradaNota: React.FC = () => {
     );
   }
 
-  // 2. TELA DE LISTAGEM DE NOTAS
   return (
     <div className="max-w-6xl mx-auto py-8 px-4">
       <div className="bg-white rounded-xl shadow-md overflow-hidden p-6 border border-emerald-100">
