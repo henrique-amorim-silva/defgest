@@ -23,6 +23,17 @@ interface EntradaNotaProps {
   empresaSelecionada?: string;
 }
 
+const formatarData = (dataStr: string) => {
+  if (!dataStr) return "-";
+  const dataLimpa = dataStr.split("T")[0]; // Remove a parte da hora (T03:00:00.000Z)
+  const partes = dataLimpa.split("-");
+  if (partes.length === 3) {
+    const [ano, mes, dia] = partes;
+    return `${dia}/${mes}/${ano}`;
+  }
+  return dataStr;
+};
+
 export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) => {
   const [listaNotas, setListaNotas] = useState<NotaFiscalHistorico[]>([]);
   const [modo, setModo] = useState<'lista' | 'formulario'>('lista');
@@ -248,7 +259,7 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
                   listaNotas.map((nota) => (
                     <tr key={nota.id} className="hover:bg-gray-50/50">
                       <td className="p-4 font-medium text-gray-800">{nota.numeroNota}</td>
-                      <td className="p-4 text-gray-600">{nota.dataEntrada}</td>
+                      <td className="p-4 text-gray-600">{formatarData(nota.dataEntrada)}</td>
                       <td className="p-4 text-gray-600">{nota.itens?.length || 0} item(ns)</td>
                       <td className="p-4 text-right space-x-2">
                         <button

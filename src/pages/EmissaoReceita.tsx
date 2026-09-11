@@ -45,12 +45,17 @@ export const EmissaoReceita: React.FC = () => {
       const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
       const token = localStorage.getItem("token");
       
-      // Recupera o ID da empresa ativa (ajuste a chave conforme você armazena no seu app, ex: localStorage ou estado global)
+      // Recupera o ID da empresa ativa
       const empresaIdAtiva = localStorage.getItem("empresaId") || "1"; 
       
-      const headers = { Authorization: `Bearer ${token}` };
+      // IMPORTANTE: Incluir o cabeçalho 'ngrok-skip-browser-warning' para evitar o bloqueio de CORS do Ngrok
+      const headers = { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+        "ngrok-skip-browser-warning": "true" 
+      };
 
-      // Adiciona o parâmetro da empresa na chamada do estoque
+      // Chamada do estoque com os headers corretos
       const resEstoque = await fetch(`${apiUrl}/estoque?empresaId=${empresaIdAtiva}`, { headers });
       if (resEstoque.ok) {
         const dadosEstoque = await resEstoque.json();
@@ -63,7 +68,7 @@ export const EmissaoReceita: React.FC = () => {
         setEstoque(listaFinalEstoque);
       }
 
-      // O mesmo vale para as receitas, se necessário filtrar por empresa:
+      // Chamada das receitas com os headers corretos
       const resReceitas = await fetch(`${apiUrl}/receitas?empresaId=${empresaIdAtiva}`, { headers });
       if (resReceitas.ok) {
         const dadosReceitas = await resReceitas.json();

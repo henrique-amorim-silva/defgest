@@ -31,7 +31,7 @@ export interface DocumentoAgrofit {
 }
 
 export interface ProdutoAgrofitCompleto {
-  id: number;
+  id?: number | string;
   registro: string;
   nomeComercial: string;
   titularRegistro: string;
@@ -411,7 +411,7 @@ export const ConsultaAgrofit: React.FC = () => {
 
                     return (
                       <tr
-                        key={p.id}
+                        key={p.registro}
                         className="hover:bg-emerald-50/50 transition"
                       >
                         <td className="px-4 py-4 whitespace-nowrap text-sm font-mono font-medium text-emerald-800">
@@ -441,15 +441,15 @@ export const ConsultaAgrofit: React.FC = () => {
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-600">
                           <div className="font-medium text-gray-900">
-                            {p.cultura}{" "}
-                            {p.indicacoesUso && p.indicacoesUso.length > 1 && (
+                            {/* {p.cultura}{" "} */}
+                            {/* {p.indicacoesUso && p.indicacoesUso.length > 1 && (
                               <span className="text-xs text-emerald-600 font-normal">
                                 (+{p.indicacoesUso.length - 1} outras)
                               </span>
-                            )}
+                            )} */}
                           </div>
                           <div className="text-xs text-gray-500 truncate max-w-xs">
-                            Alvo: {p.praga}
+                            {/* Alvo: {p.praga} */}
                           </div>
                           {p.indicacoesUso && p.indicacoesUso.length > 0 && (
                             <button

@@ -50,6 +50,24 @@ export async function emitirReceita(dados: {
   });
 }
 
+export async function atualizarReceita(
+  id: number,
+  dados: {
+    numeroReceita?: string;
+    produtorNome: string;
+    produtorCpfCnpj: string;
+    propriedadeNome: string;
+    orientacoes?: string;
+    dataEmissao?: string;
+    itens: ItemReceita[];
+  }
+): Promise<any> {
+  return await apiRequest(`/receitas/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(dados),
+  });
+}
+
 export async function excluirReceita(id: number): Promise<void> {
   return await apiRequest(`/receitas/${id}`, {
     method: 'DELETE',
