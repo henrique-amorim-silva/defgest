@@ -19,7 +19,11 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     setCarregando(true);
 
     try {
-      const response = await fetch("http://localhost:3001/api/login", {
+      // Usa a URL configurada no ambiente (ex: Ngrok) ou cai para localhost se não houver
+      const apiUrl =
+        import.meta.env.VITE_API_URL || "http://localhost:3001/api";
+
+      const response = await fetch(`${apiUrl}/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
