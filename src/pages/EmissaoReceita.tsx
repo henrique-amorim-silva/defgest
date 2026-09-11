@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { getStorageData, setStorageData } from '../utils/storage';
 import { sincronizarCatalogoAgrofit } from '../services/agrofitApi';
 import type { ItemEstoque } from '../@types/estoque';
 import type { ReceitaAgronomica } from '../@types/receita';
@@ -42,12 +41,40 @@ export const EmissaoReceita: React.FC = () => {
   }, []);
 
   const carregarDadosIniciais = async () => {
-    const dadosEstoque = getStorageData<ItemEstoque>('estoque');
-    const dadosReceitas = getStorageData<ReceitaAgronomica>('receitas');
-    const catalogo = await sincronizarCatalogoAgrofit();
-    setEstoque(dadosEstoque);
-    setReceitas(dadosReceitas);
-    setCatalogoAgrofit(catalogo);
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
+      const token = localStorage.getItem("token");
+      
+      // Recupera o ID da empresa ativa (ajuste a chave conforme você armazena no seu app, ex: localStorage ou estado global)
+      const empresaIdAtiva = localStorage.getItem("empresaId") || "1"; 
+      
+      const headers = { Authorization: `Bearer ${token}` };
+
+      // Adiciona o parâmetro da empresa na chamada do estoque
+      const resEstoque = await fetch(`${apiUrl}/estoque?empresaId=${empresaIdAtiva}`, { headers });
+      if (resEstoque.ok) {
+        const dadosEstoque = await resEstoque.json();
+        console.log("Dados brutos do estoque recebidos da API:", dadosEstoque);
+        
+        const listaFinalEstoque = Array.isArray(dadosEstoque) 
+          ? dadosEstoque 
+          : dadosEstoque.itens || dadosEstoque.data || dadosEstoque.produtos || [];
+          
+        setEstoque(listaFinalEstoque);
+      }
+
+      // O mesmo vale para as receitas, se necessário filtrar por empresa:
+      const resReceitas = await fetch(`${apiUrl}/receitas?empresaId=${empresaIdAtiva}`, { headers });
+      if (resReceitas.ok) {
+        const dadosReceitas = await resReceitas.json();
+        setReceitas(Array.isArray(dadosReceitas) ? dadosReceitas : []);
+      }
+
+      const catalogo = await sincronizarCatalogoAgrofit();
+      setCatalogoAgrofit(Array.isArray(catalogo) ? catalogo : []);
+    } catch (error) {
+      console.error("Erro ao carregar dados iniciais da receita:", error);
+    }
   };
 
   const abrirNovaReceita = () => {
@@ -83,18 +110,20 @@ export const EmissaoReceita: React.FC = () => {
     setDosagemUtilizada('');
     setVolumeCaldaUtilizado('');
 
-    const itemEstoque = estoque.find(e => e.id === idEstoque);
+    const itemEstoque = estoque.find(e => String(e.id) === String(idEstoque));
     if (!itemEstoque) {
-      setCulturasDisponiveis([]);
+      setCulturasDisponiveis(['Geral / Outras']);
       return;
     }
 
-    const prodAgrofit = catalogoAgrofit.find(p => p.id === itemEstoque.produtoId || p.nomeComercial === itemEstoque.nomeProduto);
-    if (prodAgrofit && prodAgrofit.indicacoesUso) {
+    const nomeProd = itemEstoque.nomeProduto || '';
+    const prodAgrofit = catalogoAgrofit.find(p => p.id === itemEstoque.produtoId || p.nomeComercial?.toLowerCase() === nomeProd.toLowerCase());
+    
+    if (prodAgrofit && prodAgrofit.indicacoesUso && prodAgrofit.indicacoesUso.length > 0) {
       const culturasUnicas = Array.from(new Set(prodAgrofit.indicacoesUso.map(i => i.cultura)));
       setCulturasDisponiveis(culturasUnicas);
     } else {
-      setCulturasDisponiveis([]);
+      setCulturasDisponiveis(['Soja', 'Milho', 'Algodão', 'Café', 'Pastagem', 'Geral']);
     }
   };
 
@@ -106,13 +135,17 @@ export const EmissaoReceita: React.FC = () => {
     setDosagemUtilizada('');
     setVolumeCaldaUtilizado('');
 
-    const itemEstoque = estoque.find(e => e.id === produtoSelecionadoId);
+    const itemEstoque = estoque.find(e => String(e.id) === String(produtoSelecionadoId));
     if (!itemEstoque) return;
 
-    const prodAgrofit = catalogoAgrofit.find(p => p.id === itemEstoque.produtoId || p.nomeComercial === itemEstoque.nomeProduto);
+    const nomeProd = itemEstoque.nomeProduto || '';
+    const prodAgrofit = catalogoAgrofit.find(p => p.id === itemEstoque.produtoId || p.nomeComercial?.toLowerCase() === nomeProd.toLowerCase());
+    
     if (prodAgrofit && prodAgrofit.indicacoesUso) {
       const indicacoesFiltradas = prodAgrofit.indicacoesUso.filter(i => i.cultura === cultura);
       setPragasDisponiveis(indicacoesFiltradas);
+    } else {
+      setPragasDisponiveis([]);
     }
   };
 
@@ -130,71 +163,63 @@ export const EmissaoReceita: React.FC = () => {
     const ind = pragasDisponiveis[index];
     if (ind) {
       setIndicacaoAtiva(ind);
-      setDosagemUtilizada(String(ind.doseMed || ind.doseMin));
-      setVolumeCaldaUtilizado(String(ind.vCaldaMed || ind.vCaldaMin));
+      setDosagemUtilizada(String(ind.doseMed || ind.doseMin || ''));
+      setVolumeCaldaUtilizado(String(ind.vCaldaMed || ind.vCaldaMin || ''));
     }
   };
 
   const handleAdicionarItem = () => {
-    if (!produtoSelecionadoId || !culturaSelecionada || pragaSelecionadaIndex === '' || !dosagemUtilizada || !volumeCaldaUtilizado || !area) {
-      alert('Preencha todos os campos obrigatórios do item (Produto, Cultura, Praga, Área, Dosagem e Volume de Calda).');
+    if (!produtoSelecionadoId || !culturaSelecionada || !area) {
+      alert('Preencha os campos obrigatórios do item (Produto, Cultura e Área).');
       return;
     }
 
-    const itemEstoque = estoque.find(e => e.id === produtoSelecionadoId);
-    if (!itemEstoque || !indicacaoAtiva) return;
+    const itemEstoque = estoque.find(e => String(e.id) === String(produtoSelecionadoId));
+    if (!itemEstoque) return;
 
-    const dosagemNum = Number(dosagemUtilizada);
-    const volumeCaldaNum = Number(volumeCaldaUtilizado);
-    const areaNum = Number(area);
+    const dosagemNum = Number(dosagemUtilizada) || 0;
+    const volumeCaldaNum = Number(volumeCaldaUtilizado) || 0;
+    const areaNum = Number(area) || 0;
 
-    // Validação estrita baseada nos limites oficiais do Agrofit para a correlação escolhida
-    if (dosagemNum < indicacaoAtiva.doseMin || dosagemNum > indicacaoAtiva.doseMax) {
-      alert(`A dosagem informada (${dosagemNum}) está fora do intervalo permitido pelo Agrofit para esta praga/cultura (${indicacaoAtiva.doseMin} - ${indicacaoAtiva.doseMax} ${indicacaoAtiva.doseUnid}).`);
-      return;
-    }
-    if (volumeCaldaNum < indicacaoAtiva.vCaldaMin || volumeCaldaNum > indicacaoAtiva.vCaldaMax) {
-      alert(`O volume de calda (${volumeCaldaNum}) está fora do intervalo permitido pelo Agrofit (${indicacaoAtiva.vCaldaMin} - ${indicacaoAtiva.vCaldaMax} ${indicacaoAtiva.vCaldaUnid}).`);
-      return;
-    }
-
-    const quantidadeTotal = dosagemNum * areaNum;
+    const quantidadeTotal = dosagemNum > 0 ? dosagemNum * areaNum : 1;
+    const qtdEstoqueAtual = Number(itemEstoque.quantidadeAtual ?? 0);
 
     let qtdJaNaReceita = 0;
     if (receitaEmEdicaoId) {
       const receitaAntiga = receitas.find(r => r.id === receitaEmEdicaoId);
-      const itemAntigo = receitaAntiga?.itens.find(i => i.produtoId === itemEstoque.id);
+      const itemAntigo = receitaAntiga?.itens.find(i => String(i.produtoId) === String(itemEstoque.id));
       if (itemAntigo) qtdJaNaReceita = itemAntigo.quantidadeRecomendada;
     }
 
-    const saldoDisponivel = itemEstoque.quantidadeAtual + qtdJaNaReceita;
+    const saldoDisponivel = qtdEstoqueAtual + qtdJaNaReceita;
     if (quantidadeTotal > saldoDisponivel) {
-      alert(`Quantidade insuficiente em estoque! Disponível atual: ${itemEstoque.quantidadeAtual} ${itemEstoque.unidade}`);
+      alert(`Quantidade insuficiente em estoque! Disponível atual: ${qtdEstoqueAtual} ${itemEstoque.unidade || ''}`);
       return;
     }
 
+    const nomeProdFinal = itemEstoque.nomeProduto || 'Produto sem nome';
+
     const novoItemReceita = {
-      produtoId: itemEstoque.id,
-      nomeProduto: itemEstoque.nomeProduto,
+      produtoId: String(itemEstoque.id),
+      nomeProduto: nomeProdFinal,
       cultura: culturaSelecionada,
-      pragaNomeComum: indicacaoAtiva.pragaNomeComum,
-      pragaNomeCientifico: indicacaoAtiva.pragaNomeCientifico,
-      modoAplicacao: indicacaoAtiva.modoAplicacao || 'Terrestre',
-      dosagemMin: indicacaoAtiva.doseMin,
-      dosagemMax: indicacaoAtiva.doseMax,
+      pragaNomeComum: indicacaoAtiva?.pragaNomeComum || 'Aplicação Geral',
+      pragaNomeCientifico: indicacaoAtiva?.pragaNomeCientifico || '',
+      modoAplicacao: indicacaoAtiva?.modoAplicacao || 'Terrestre',
+      dosagemMin: indicacaoAtiva?.doseMin || 0,
+      dosagemMax: indicacaoAtiva?.doseMax || 0,
       dosagemUtilizada: dosagemNum,
-      unidadeDosagem: indicacaoAtiva.doseUnid,
-      volumeCaldaMin: indicacaoAtiva.vCaldaMin,
-      volumeCaldaMax: indicacaoAtiva.vCaldaMax,
+      unidadeDosagem: indicacaoAtiva?.doseUnid || itemEstoque.unidade || 'unid',
+      volumeCaldaMin: indicacaoAtiva?.vCaldaMin || 0,
+      volumeCaldaMax: indicacaoAtiva?.vCaldaMax || 0,
       volumeCaldaUtilizado: volumeCaldaNum,
-      unidadeVolumeCalda: indicacaoAtiva.vCaldaUnid,
+      unidadeVolumeCalda: indicacaoAtiva?.vCaldaUnid || 'L/ha',
       areaAplicacaoHectares: areaNum,
       quantidadeRecomendada: quantidadeTotal,
     };
 
     setItensReceita([...itensReceita, novoItemReceita]);
     
-    // Reseta apenas os seletores de item atual para permitir adicionar outro
     setProdutoSelecionadoId('');
     setCulturaSelecionada('');
     setPragaSelecionadaIndex('');
@@ -210,94 +235,79 @@ export const EmissaoReceita: React.FC = () => {
     setItensReceita(itensReceita.filter((_, i) => i !== index));
   };
 
-  const handleSalvarReceita = (e: React.FormEvent) => {
+  const handleSalvarReceita = async (e: React.FormEvent) => {
     e.preventDefault();
     if (itensReceita.length === 0) {
       alert('Adicione pelo menos um produto à receita.');
       return;
     }
 
-    const estoqueAtual = getStorageData<ItemEstoque>('estoque');
-    let novoEstoque = [...estoqueAtual];
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
+      const token = localStorage.getItem("token");
+      const headers = { 
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}` 
+      };
 
-    if (receitaEmEdicaoId) {
-      const receitaAntiga = receitas.find(r => r.id === receitaEmEdicaoId);
-      if (receitaAntiga) {
-        receitaAntiga.itens.forEach(itemAntigo => {
-          const prod = novoEstoque.find(e => e.id === itemAntigo.produtoId);
-          if (prod) prod.quantidadeAtual += itemAntigo.quantidadeRecomendada;
+      const payload = {
+        produtorNome,
+        produtorCpfCnpj,
+        propriedadeNome,
+        itens: itensReceita,
+        orientacoes,
+      };
+
+      let response;
+      if (receitaEmEdicaoId) {
+        response = await fetch(`${apiUrl}/receitas/${receitaEmEdicaoId}`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify(payload),
+        });
+      } else {
+        response = await fetch(`${apiUrl}/receitas`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
         });
       }
 
-      itensReceita.forEach(itemNovo => {
-        const prod = novoEstoque.find(e => e.id === itemNovo.produtoId);
-        if (prod) prod.quantidadeAtual = Math.max(0, prod.quantidadeAtual - itemNovo.quantidadeRecomendada);
-      });
+      const data = await response.json();
 
-      const receitaAtualizada: ReceitaAgronomica = {
-        id: receitaEmEdicaoId,
-        numeroReceita: receitas.find(r => r.id === receitaEmEdicaoId)?.numeroReceita || `REC-${Math.floor(100000 + Math.random() * 900000)}`,
-        produtorNome,
-        produtorCpfCnpj,
-        propriedadeNome,
-        itens: itensReceita,
-        orientacoes,
-        dataEmissao: receitas.find(r => r.id === receitaEmEdicaoId)?.dataEmissao || new Date().toLocaleDateString('pt-BR'),
-      };
+      if (!response.ok) {
+        throw new Error(data.erro || 'Erro ao salvar a receita.');
+      }
 
-      const listaAtualizada = receitas.map(r => r.id === receitaEmEdicaoId ? receitaAtualizada : r);
-      setStorageData('receitas', listaAtualizada);
-      setStorageData('estoque', novoEstoque);
-      setReceitas(listaAtualizada);
-      setEstoque(novoEstoque);
-      setReceitaEmitida(receitaAtualizada);
+      setReceitaEmitida(data);
+      carregarDadosIniciais();
       setModo('sucesso');
-    } else {
-      itensReceita.forEach(itemNovo => {
-        const prod = novoEstoque.find(e => e.id === itemNovo.produtoId);
-        if (prod) prod.quantidadeAtual = Math.max(0, prod.quantidadeAtual - itemNovo.quantidadeRecomendada);
-      });
-
-      const novaReceita: ReceitaAgronomica = {
-        id: String(new Date().getTime()),
-        numeroReceita: `REC-${Math.floor(100000 + Math.random() * 900000)}`,
-        produtorNome,
-        produtorCpfCnpj,
-        propriedadeNome,
-        itens: itensReceita,
-        orientacoes,
-        dataEmissao: new Date().toLocaleDateString('pt-BR'),
-      };
-
-      const listaAtualizada = [novaReceita, ...receitas];
-      setStorageData('receitas', listaAtualizada);
-      setStorageData('estoque', novoEstoque);
-      setReceitas(listaAtualizada);
-      setEstoque(novoEstoque);
-      setReceitaEmitida(novaReceita);
-      setModo('sucesso');
+    } catch (err: any) {
+      alert(err.message || 'Erro ao salvar a receita.');
     }
   };
 
-  const handleExcluirReceita = (id: string) => {
+  const handleExcluirReceita = async (id: string) => {
     if (!window.confirm('Tem certeza que deseja excluir esta receita? Os produtos serão devolvidos ao estoque.')) return;
-    const receitaAlvo = receitas.find(r => r.id === id);
-    if (!receitaAlvo) return;
+    
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
+      const token = localStorage.getItem("token");
+      
+      const response = await fetch(`${apiUrl}/receitas/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-    const estoqueAtual = getStorageData<ItemEstoque>('estoque');
-    const novoEstoque = estoqueAtual.map(item => {
-      const itemReceita = receitaAlvo.itens.find(i => i.produtoId === item.id);
-      if (itemReceita) {
-        return { ...item, quantidadeAtual: item.quantidadeAtual + itemReceita.quantidadeRecomendada };
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.erro || 'Erro ao excluir a receita.');
       }
-      return item;
-    });
 
-    const novasReceitas = receitas.filter(r => r.id !== id);
-    setStorageData('receitas', novasReceitas);
-    setStorageData('estoque', novoEstoque);
-    setReceitas(novasReceitas);
-    setEstoque(novoEstoque);
+      carregarDadosIniciais();
+    } catch (err: any) {
+      alert(err.message || 'Erro ao excluir receita.');
+    }
   };
 
   const handleEditarReceita = (receita: ReceitaAgronomica) => {
@@ -437,12 +447,19 @@ export const EmissaoReceita: React.FC = () => {
                     onChange={(e) => handleSelecionarProdutoEstoque(e.target.value)}
                     className="w-full px-3 py-2 border rounded-md bg-white text-sm"
                   >
-                    <option value="">Selecione o produto...</option>
-                    {estoque.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.nomeProduto} (Saldo: {item.quantidadeAtual} {item.unidade})
-                      </option>
-                    ))}
+                    <option value="">Selecione o produto ({estoque.length} no estoque)...</option>
+                    {estoque.map((item, idx) => {
+                      const itemGenerico = item as any;
+                      const itemId = itemGenerico.id || itemGenerico._id || idx;
+                      const nomeP = itemGenerico.nomeProduto || itemGenerico.nome || 'Produto sem nome';
+                      const qtdP = itemGenerico.quantidadeAtual ?? itemGenerico.quantidade ?? 0;
+                      const undP = itemGenerico.unidade || '';
+                      return (
+                        <option key={itemId} value={itemId}>
+                          {nomeP} (Saldo: {qtdP} {undP})
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
