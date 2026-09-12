@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, Package, FilePlus, FileText, Database, ShieldAlert, Building2 } from 'lucide-react';
+import { apiRequest } from '../services/api'; // <-- 1. Importe o apiRequest do arquivo de services
 
 interface NavbarProps {
   currentTab: string;
@@ -20,17 +21,21 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, empre
 
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   
+  // 2. Substitua o fetch manual pela chamada via apiRequest padronizada
   useEffect(() => {
     if (isAdminMaster) {
-      const token = localStorage.getItem('token');
-      fetch('http://localhost:3001/api/empresas', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) setEmpresas(data);
-        })
-        .catch(err => console.error('Erro ao buscar empresas:', err));
+      const carregarEmpresasNavbar = async () => {
+        try {
+          const data = await apiRequest("empresas");
+          if (Array.isArray(data)) {
+            setEmpresas(data);
+          }
+        } catch (err: any) {
+          console.error('Erro ao buscar empresas no Navbar:', err);
+        }
+      };
+
+      carregarEmpresasNavbar();
     }
   }, [isAdminMaster]);
 

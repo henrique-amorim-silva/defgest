@@ -25,17 +25,46 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, empresaSele
 
         setTotalLotes(estoque.length);
         
-        // Conta produtos únicos pelo nome do produto
-        const produtosUnicos = new Set(estoque.map((i) => i.nomeProduto)).size;
+        // Conta produtos únicos de forma segura
+        const produtosUnicos = new Set(
+          estoque.map((i: any) => {
+            const nome = i.nomeProduto || i.nome_produto || i.produto || i.descricao || '';
+            return nome.toString().trim().toLowerCase();
+          }).filter(Boolean)
+        ).size;
+        
         setTotalProdutos(produtosUnicos);
+
+        // Função auxiliar para converter diferentes formatos de data da API (ISO ou DD/MM/AAAA) para objeto Date
+        const parseDataValidade = (item: any) => {
+          const valorBruto = item.dataValidade || item.data_validade || item.validade || item.dataVal;
+          if (!valorBruto) return null;
+
+          // Se já for uma string no formato DD/MM/AAAA (ex: "10/10/2026")
+          if (typeof valorBruto === 'string' && valorBruto.includes('/')) {
+            const [dia, mes, ano] = valorBruto.split('/');
+            if (dia && mes && ano) {
+              return new Date(Number(ano), Number(mes) - 1, Number(dia));
+            }
+          }
+
+          // Tenta o parser padrão do JS
+          const dataParsed = new Date(valorBruto);
+          return isNaN(dataParsed.getTime()) ? null : dataParsed;
+        };
 
         // Identificar lotes vencendo nos próximos 30 dias ou já vencidos
         const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+
         const trintaDiasFrente = new Date();
         trintaDiasFrente.setDate(hoje.getDate() + 30);
+        trintaDiasFrente.setHours(23, 59, 59, 999);
 
-        const lotesAlerta = estoque.filter((item) => {
-          const dataVal = new Date(item.dataValidade);
+        const lotesAlerta = estoque.filter((item: any) => {
+          const dataVal = parseDataValidade(item);
+          if (!dataVal) return false;
+          // Retorna verdadeiro se a data de validade for menor ou igual a 30 dias a partir de hoje
           return dataVal <= trintaDiasFrente;
         });
 
