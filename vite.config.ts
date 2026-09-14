@@ -16,7 +16,7 @@ export default defineConfig({
         short_name: 'DefGest',
         description: 'Sistema de Controle de Estoque e Receituário Agronômico',
         theme_color: '#059669',
-        background_color: 'transparent', // Alterado para o verde do tema para evitar o fundo branco bruto
+        background_color: 'transparent', // Mantém o fundo transparente
         display: 'standalone',
         scope: '/defgest/',
         start_url: '/defgest/',
