@@ -414,88 +414,76 @@ export const ConsultaAgrofit: React.FC = () => {
                         key={p.registro}
                         className="hover:bg-emerald-50/50 transition"
                       >
-                        <td className="px-4 py-4 whitespace-nowrap text-sm font-mono font-medium text-emerald-800">
+                        <td className="px-3 py-3 whitespace-nowrap text-xs font-mono font-medium text-emerald-800">
                           {p.registro}
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                        <td className="px-3 py-3 whitespace-nowrap text-xs font-bold text-gray-900 max-w-40 truncate" title={p.nomeComercial}>
                           {p.nomeComercial}
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                        <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-600 max-w-35 truncate" title={p.titularRegistro}>
                           {p.titularRegistro}
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800 font-medium">
+                        <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-800 font-medium max-w-45 truncate" title={p.ingredienteAtivo}>
                           {p.ingredienteAtivo}
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
-                          <div className="text-xs font-semibold text-gray-800">
+                        <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-600 max-w-35 truncate" title={`${p.formulacao} - ${p.grupoQuimico}`}>
+                          <div className="font-semibold text-gray-800 truncate">
                             {p.formulacao}
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-[11px] text-gray-500 truncate">
                             {p.grupoQuimico}
                           </div>
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm">
-                          <span className="px-2.5 py-1 text-xs font-medium bg-amber-50 text-amber-900 rounded-full border border-amber-200">
+                        <td className="px-3 py-3 whitespace-nowrap text-xs">
+                          <span className="px-2 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-900 rounded-full border border-amber-200 inline-block truncate max-w-30" title={p.classeToxicologica}>
                             {p.classeToxicologica}
                           </span>
                         </td>
-                        <td className="px-4 py-4 text-sm text-gray-600">
-                          <div className="font-medium text-gray-900">
-                            {/* {p.cultura}{" "} */}
-                            {/* {p.indicacoesUso && p.indicacoesUso.length > 1 && (
-                              <span className="text-xs text-emerald-600 font-normal">
-                                (+{p.indicacoesUso.length - 1} outras)
-                              </span>
-                            )} */}
-                          </div>
-                          <div className="text-xs text-gray-500 truncate max-w-xs">
-                            {/* Alvo: {p.praga} */}
-                          </div>
+                        <td className="px-3 py-3 text-xs text-gray-600 whitespace-nowrap">
                           {p.indicacoesUso && p.indicacoesUso.length > 0 && (
                             <button
                               onClick={() => setProdutoModal(p)}
-                              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-800 transition"
+                              className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-800 transition"
                             >
-                              <Eye className="h-3 w-3" /> Ver todas as
-                              correlações ({p.indicacoesUso.length})
+                              <Eye className="h-3 w-3" /> Ver correlações ({p.indicacoesUso.length})
                             </button>
                           )}
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-700">
+                        <td className="px-3 py-3 whitespace-nowrap text-xs font-bold text-gray-700">
                           {p.unidadePadrao}
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-center text-sm">
+                        <td className="px-3 py-3 whitespace-nowrap text-center text-xs">
                           {docBula && docBula.url ? (
                             <a
                               href={docBula.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-md shadow-sm transition"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-medium rounded shadow-sm transition"
                               title="Visualizar Bula"
                             >
-                              <FileText className="h-4 w-4" /> Ver Bula
+                              <FileText className="h-3.5 w-3.5" /> Bula
                             </a>
                           ) : (
-                            <span className="text-xs text-gray-400 italic">
-                              Indisponível
+                            <span className="text-[11px] text-gray-400 italic">
+                              -
                             </span>
                           )}
                         </td>
                         {isAdminMaster && (
-                          <td className="px-4 py-4 whitespace-nowrap text-center text-sm space-x-1">
+                          <td className="px-3 py-3 whitespace-nowrap text-center text-xs space-x-1">
                             <button
                               onClick={() => abrirModalEdicao(p)}
-                              className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded"
+                              className="p-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded"
                               title="Editar"
                             >
-                              <Edit className="h-4 w-4" />
+                              <Edit className="h-3.5 w-3.5" />
                             </button>
                             <button
                               onClick={() => handleDelete(p.registro)}
-                              className="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded"
+                              className="p-1 bg-red-50 text-red-600 hover:bg-red-100 rounded"
                               title="Excluir"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </td>
                         )}

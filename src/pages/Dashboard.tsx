@@ -183,17 +183,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, empresaSele
             <p className="text-sm text-gray-500 py-6 text-center">Nenhum lote com alerta de vencimento próximo.</p>
           ) : (
             <div className="space-y-3 max-h-48 overflow-y-auto">
-              {alertasVencimento.map((item) => (
-                <div key={item.id} className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex justify-between items-center text-sm">
-                  <div>
-                    <p className="font-semibold text-gray-900">{item.nomeProduto}</p>
-                    <p className="text-xs text-gray-600">Lote: {item.lote} | Qtd: {item.quantidadeAtual} {item.unidade}</p>
+              {alertasVencimento.map((item: any, idx: number) => {
+                // Trata as variações dos nomes dos campos vindos do backend
+                const nomeProd = item.nomeProduto || item.nome_produto || item.produto || item.descricao || 'Produto sem nome';
+                const loteNum = item.lote || item.numeroLote || item.lote_num || 'N/D';
+                const quantidade = item.quantidadeAtual ?? item.quantidade_atual ?? item.quantidade ?? 0;
+                const unidadeMedida = item.unidade || item.unidade_medida || '';
+                
+                // Trata a exibição da data de validade
+                let dataValFormatada = item.dataValidade || item.data_validade || item.validade || '';
+                if (dataValFormatada && dataValFormatada.includes('T')) {
+                  // Se vier em formato ISO (ex: 2026-10-10T00:00:00.000Z), converte para DD/MM/AAAA
+                  const [ano, mes, dia] = dataValFormatada.split('T')[0].split('-');
+                  if (ano && mes && dia) dataValFormatada = `${dia}/${mes}/${ano}`;
+                }
+
+                return (
+                  <div key={item.id || idx} className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex justify-between items-center text-sm">
+                    <div>
+                      <p className="font-semibold text-gray-900">{nomeProd}</p>
+                      <p className="text-xs text-gray-600">Lote: {loteNum} | Qtd: {quantidade} {unidadeMedida}</p>
+                    </div>
+                    <span className="text-xs font-bold bg-amber-200 text-amber-900 px-2 py-1 rounded whitespace-nowrap ml-2">
+                      Val: {dataValFormatada || 'Não informada'}
+                    </span>
                   </div>
-                  <span className="text-xs font-bold bg-amber-200 text-amber-900 px-2 py-1 rounded">
-                    Val: {item.dataValidade}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

@@ -352,7 +352,7 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada }) => {
                           {item.nomeProduto}
                         </td>
                         <td className="px-6 py-4 text-center">
-                          <span className="bg-emerald-100 text-emerald-800 font-extrabold px-3 py-1 rounded-full text-base">
+                          <span className="bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-full text-xs">
                             {item.quantidadeTotal} {item.unidade}
                           </span>
                         </td>

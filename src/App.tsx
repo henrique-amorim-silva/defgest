@@ -29,13 +29,20 @@ export function App() {
   };
 
   if (!token) {
-    return <Login onLoginSuccess={() => setToken(localStorage.getItem("token"))} />;
+    return (
+      <Login onLoginSuccess={() => setToken(localStorage.getItem("token"))} />
+    );
   }
 
   const renderScreen = () => {
     switch (currentTab) {
       case "dashboard":
-        return <Dashboard setCurrentTab={setCurrentTab} empresaSelecionada={empresaSelecionada} />;
+        return (
+          <Dashboard
+            setCurrentTab={setCurrentTab}
+            empresaSelecionada={empresaSelecionada}
+          />
+        );
       case "estoque":
         return <Estoque empresaSelecionada={empresaSelecionada} />;
       case "entrada":
@@ -45,15 +52,20 @@ export function App() {
       case "agrofit":
         return <ConsultaAgrofit />;
       case "admin_usuarios":
-        return <GerenciamentoUsuarios  />;
+        return <GerenciamentoUsuarios />;
       default:
-        return <Dashboard setCurrentTab={setCurrentTab} empresaSelecionada={empresaSelecionada} />;
+        return (
+          <Dashboard
+            setCurrentTab={setCurrentTab}
+            empresaSelecionada={empresaSelecionada}
+          />
+        );
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col font-sans">
-      <div className="bg-white border-b border-gray-200 px-6 py-2 flex justify-between items-center text-sm">
+      <div className="bg-emerald-50/70 backdrop-blur-md px-6 border-none py-0 flex justify-between items-center text-sm">
         <span className="text-gray-600 font-medium">Sessão Ativa</span>
         <button
           onClick={handleLogout}
@@ -62,16 +74,17 @@ export function App() {
           <LogOut className="h-4 w-4" /> Sair
         </button>
       </div>
-
-      <Navbar 
-        currentTab={currentTab} 
-        setCurrentTab={setCurrentTab} 
+      <Navbar
+        currentTab={currentTab}
+        setCurrentTab={setCurrentTab}
         empresaSelecionada={empresaSelecionada}
         setEmpresaSelecionada={setEmpresaSelecionada}
       />
+
       <main className="flex-1">{renderScreen()}</main>
       <footer className="bg-white border-t border-gray-200 py-4 text-center text-xs text-gray-500">
-        DEFGEST &copy; 2026 - Sistema de Controle de Estoque e Receituário Agronômico[cite: 5]
+        DEFGEST &copy; 2026 - Sistema de Controle de Estoque e Receituário
+        Agronômico[cite: 5]
       </footer>
     </div>
   );
