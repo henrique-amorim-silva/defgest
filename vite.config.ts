@@ -10,7 +10,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'images/nav-logo.png'],
+      includeAssets: ['favicon.ico', 'icons.svg'],
       manifest: {
         name: 'DefGest - Controle Agronômico',
         short_name: 'DefGest',
@@ -22,12 +22,12 @@ export default defineConfig({
         start_url: '/defgest/',
         icons: [
           {
-            src: 'images/nav-logo.png',
+            src: 'icons.svg',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: 'images/nav-logo.png',
+            src: 'icons.svg',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable'
