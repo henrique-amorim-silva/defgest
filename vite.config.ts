@@ -10,22 +10,22 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'icons.svg'],
+      includeAssets: ['favicon.ico', 'images/pwa-icon.png'],
       manifest: {
         name: 'DefGest - Controle Agronômico',
         short_name: 'DefGest',
         description: 'Sistema de Controle de Estoque e Receituário Agronômico',
         theme_color: '#059669',
-        background_color: 'transparent', // Mantém o fundo transparente
+        background_color: '#059669', // Cor de fundo do splash screen combinando com o tema
         display: 'standalone',
         scope: '/defgest/',
         start_url: '/defgest/',
         icons: [
           {
-            src: 'icons.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
-            purpose: 'any maskable'
+            src: 'images/pwa-icon.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any' // Evita que o Android aplique zoom e corte as bordas
           }
         ]
       }
