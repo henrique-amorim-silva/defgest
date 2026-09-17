@@ -1,17 +1,25 @@
 // src/services/estoqueApi.ts
 import { apiRequest } from './api';
 
+// Representa um Lote específico do produto na tabela `lote_validade`
+export interface LoteEstoque {
+  id: number;
+  lote: string;
+  quantidadeAtual: number;
+  dataValidade: string;
+  numeroNotaFiscal?: string;
+  dataEntrada?: string;
+}
+
+// Representa o Produto no Estoque (tabela `estoque`), que agora agrupa seus lotes
 export interface ItemEstoque {
   id: number;
   empresaId?: number;
   nomeProduto: string;
-  lote: string;
-  quantidadeAtual: number;
   unidade: string;
-  dataValidade: string;
-  numeroNotaFiscal: string;
-  dataEntrada: string;
-  usuarioNome?: string;
+  embalagem?: string;
+  estMin?: number; // Ajustado para estMin (conforme o banco/backend)
+  lotes: LoteEstoque[]; // Os lotes agora vêm agrupados em um array
 }
 
 export async function listarEstoque(empresaId?: string): Promise<ItemEstoque[]> {
@@ -19,7 +27,9 @@ export async function listarEstoque(empresaId?: string): Promise<ItemEstoque[]> 
   return await apiRequest(`/estoque${query}`);
 }
 
-export async function cadastrarItemEstoque(item: Omit<ItemEstoque, 'id'>): Promise<ItemEstoque> {
+// Como o cadastro direto unitário de estoque pode ter mudado para notas fiscais,
+// mantemos a tipagem genérica caso seja usada em outro lugar:
+export async function cadastrarItemEstoque(item: any): Promise<any> {
   return await apiRequest('/estoque', {
     method: 'POST',
     body: JSON.stringify(item),
@@ -41,6 +51,7 @@ export interface ItemNotaHistorico {
   lote: string;
   quantidade: number;
   unidade: string;
+  embalagem?: string;
   dataValidade: string;
 }
 

@@ -16,6 +16,8 @@ interface ItemNotaTemporario {
   lote: string;
   quantidade: string;
   unidade: "L" | "KG" | "ML" | "G";
+  embalagem: string;
+  estMin?: string;
   dataValidade: string;
 }
 
@@ -34,6 +36,12 @@ const formatarData = (dataStr: string) => {
   return dataStr;
 };
 
+// Função auxiliar para isolar apenas a parte YYYY-MM-DD para inputs de tipo date
+const formatarDataParaInput = (dataStr: string) => {
+  if (!dataStr) return new Date().toISOString().split("T")[0];
+  return dataStr.split("T")[0];
+};
+
 export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) => {
   const [listaNotas, setListaNotas] = useState<NotaFiscalHistorico[]>([]);
   const [modo, setModo] = useState<'lista' | 'formulario'>('lista');
@@ -46,13 +54,15 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
   // Lista de itens adicionados na nota atual
   const [itensNota, setItensNota] = useState<ItemNotaTemporario[]>([]);
 
-  // Estados para busca e seleção do item atual (Formato original)
+  // Estados para busca e seleção do item atual
   const [termoBusca, setTermoBusca] = useState("");
   const [produtosDisponiveis, setProdutosDisponiveis] = useState<ProdutoAgrofitCompleto[]>([]);
   const [produtoSelecionado, setProdutoSelecionado] = useState<ProdutoAgrofitCompleto | null>(null);
   const [lote, setLote] = useState("");
   const [quantidade, setQuantidade] = useState("");
   const [unidade, setUnidade] = useState<"L" | "KG" | "ML" | "G">("L");
+  const [embalagem, setEmbalagem] = useState("");
+  const [estMin, setEstMin] = useState("");
   const [dataValidade, setDataValidade] = useState("");
 
   useEffect(() => {
@@ -90,6 +100,8 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
     setProdutoSelecionado(null);
     setLote("");
     setQuantidade("");
+    setEmbalagem("");
+    setEstMin("");
     setDataValidade("");
     setTermoBusca("");
   };
@@ -116,8 +128,8 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
   };
 
   const handleAdicionarItemNaNota = () => {
-    if (!produtoSelecionado || !lote || !quantidade || !dataValidade) {
-      alert("Preencha todos os campos do item (Produto, Lote, Quantidade e Validade).");
+    if (!produtoSelecionado || !lote || !quantidade || !embalagem || !dataValidade) {
+      alert("Preencha todos os campos obrigatórios do item (Produto, Lote, Quantidade, Embalagem e Validade).");
       return;
     }
 
@@ -127,6 +139,8 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
       lote,
       quantidade,
       unidade,
+      embalagem,
+      estMin,
       dataValidade,
     };
 
@@ -176,13 +190,14 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
   };
 
   const handleEditarNota = async (nota: NotaFiscalHistorico) => {
-    setNotaEmEdicaoId(nota.numeroNota);
+    setNotaEmEdicaoId(String(nota.id)); // CORRIGIDO: Passa o ID interno da nota, e não o número dela
     setNumeroNota(nota.numeroNota);
-    setDataEntradaNota(nota.dataEntrada || new Date().toISOString().split("T")[0]);
+    
+    setDataEntradaNota(formatarDataParaInput(nota.dataEntrada));
 
     const catalogo = await sincronizarCatalogoAgrofit();
 
-    const itensTempCarregados: ItemNotaTemporario[] = nota.itens.map((item) => {
+    const itensTempCarregados: ItemNotaTemporario[] = nota.itens.map((item: any) => {
       const prodEncontrado = catalogo.find(p => p.nomeComercial.toLowerCase() === item.nomeProduto.toLowerCase()) || {
         id: String(item.estoqueId),
         registro: "",
@@ -208,12 +223,14 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
       };
 
       return {
-        idTemp: String(item.id),
+        idTemp: String(item.id || new Date().getTime() + Math.random()),
         produto: prodEncontrado,
         lote: item.lote,
         quantidade: String(item.quantidade),
         unidade: item.unidade as "L" | "KG" | "ML" | "G",
-        dataValidade: item.dataValidade,
+        embalagem: item.embalagem || "",
+        estMin: item.estMin ? String(item.estMin) : "",
+        dataValidade: formatarDataParaInput(item.dataValidade),
       };
     });
 
@@ -328,7 +345,6 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
                 <PackagePlus className="w-5 h-5 text-emerald-600" /> Adicionar Produtos à Nota
               </h2>
 
-              {/* 1. Campo de busca por nome ou registro */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">Buscar Produto no Catálogo (Nome ou Registro)</label>
                 <div className="flex gap-2">
@@ -336,6 +352,12 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
                     type="text"
                     value={termoBusca}
                     onChange={(e) => setTermoBusca(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleBuscar(e);
+                      }
+                    }}
                     placeholder="Digite o nome comercial, ingrediente ativo ou registro..."
                     className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
@@ -349,7 +371,6 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
                 </div>
               </div>
 
-              {/* 2. Tabela/Lista separada para escolher o produto */}
               <div className="border border-gray-200 rounded-lg overflow-hidden max-h-60 overflow-y-auto">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-gray-50 text-gray-600 border-b border-gray-200 sticky top-0">
@@ -403,7 +424,6 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
                 </table>
               </div>
 
-              {/* Indicador do produto selecionado atual */}
               {produtoSelecionado && (
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-900 text-sm flex items-center justify-between">
                   <span>
@@ -419,8 +439,7 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
                 </div>
               )}
 
-              {/* 3. Campos complementares (Lote, Quantidade, Unidade, Validade) */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4 pt-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Lote *</label>
                   <input
@@ -459,7 +478,30 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Data de Validade *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Embalagem *</label>
+                  <input
+                    type="text"
+                    value={embalagem}
+                    onChange={(e) => setEmbalagem(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    placeholder="Ex: Bombona 20L"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Estoque Mín.</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={estMin}
+                    onChange={(e) => setEstMin(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    placeholder="Opcional"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Validade *</label>
                   <input
                     type="date"
                     value={dataValidade}
@@ -479,7 +521,6 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
                 </button>
               </div>
 
-              {/* Tabela de itens temporários */}
               <div className="mt-4 border-t border-gray-100 pt-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-2">Itens adicionados nesta nota:</h3>
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -489,6 +530,8 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
                         <th className="p-3">Produto</th>
                         <th className="p-3">Lote</th>
                         <th className="p-3">Qtd</th>
+                        <th className="p-3">Embalagem</th>
+                        <th className="p-3">Est. Mín.</th>
                         <th className="p-3">Validade</th>
                         <th className="p-3 text-right">Ação</th>
                       </tr>
@@ -496,17 +539,20 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
                     <tbody className="divide-y divide-gray-200">
                       {itensNota.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="p-4 text-center text-gray-500">
+                          <td colSpan={7} className="p-4 text-center text-gray-500">
                             Nenhum item adicionado ainda.
                           </td>
                         </tr>
                       ) : (
-                        itensNota.map((item) => (
+                        /* CORREÇÃO DO ERRO: Removido o 'itensNota.pop &&' incorreto */
+                        itensNota.map((item: ItemNotaTemporario) => (
                           <tr key={item.idTemp}>
                             <td className="p-3 font-medium text-gray-800">{item.produto.nomeComercial}</td>
                             <td className="p-3 text-gray-600">{item.lote}</td>
                             <td className="p-3 text-gray-600">{item.quantidade} {item.unidade}</td>
-                            <td className="p-3 text-gray-600">{item.dataValidade}</td>
+                            <td className="p-3 text-gray-600">{item.embalagem}</td>
+                            <td className="p-3 text-gray-600">{item.estMin || "-"}</td>
+                            <td className="p-3 text-gray-600">{formatarData(item.dataValidade)}</td>
                             <td className="p-3 text-right">
                               <button
                                 type="button"

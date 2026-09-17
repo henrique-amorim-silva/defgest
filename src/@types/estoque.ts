@@ -1,13 +1,16 @@
 // estoque.ts
 
 export interface ItemEstoque {
-  id: string;
-  produtoId: string;
+  id: number;
+  empresaId?: number;
   nomeProduto: string;
   lote: string;
   quantidadeAtual: number;
-  unidade: 'L' | 'KG' | 'ML' | 'G';
+  estoqueMinimo?: number;
+  unidade: string;
+  embalagem?: string;
   dataValidade: string;
   numeroNotaFiscal: string;
   dataEntrada: string;
+  usuarioNome?: string;
 }
