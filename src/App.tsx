@@ -7,6 +7,7 @@ import { EmissaoReceita } from "./pages/EmissaoReceita";
 import { ConsultaAgrofit } from "./pages/ConsultaAgrofit";
 import { Login } from "./pages/Login";
 import { GerenciamentoUsuarios } from "./pages/GerenciamentoUsuarios";
+import Cadastros from "./pages/Cadastros"; // <-- 1. Importado aqui
 import { LogOut } from "lucide-react";
 
 export function App() {
@@ -51,6 +52,8 @@ export function App() {
         return <EmissaoReceita />;
       case "agrofit":
         return <ConsultaAgrofit />;
+      case "cadastros": // <-- 2. Adicionado na rota/case
+        return <Cadastros empresaId={Number(empresaSelecionada) || 1} />;
       case "admin_usuarios":
         return <GerenciamentoUsuarios />;
       default:

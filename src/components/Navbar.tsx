@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Package, FilePlus, FileText, Database, ShieldAlert, Building2, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Package, FilePlus, FileText, Database, ShieldAlert, Building2, Menu, X, Users } from 'lucide-react';
 import { apiRequest } from '../services/api';
 
 interface NavbarProps {
@@ -43,6 +43,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, empre
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'estoque', label: 'Estoque', icon: Package },
     { id: 'entrada', label: 'Entrada de Nota', icon: FilePlus },
+    { id: 'cadastros', label: 'Cadastros', icon: Users }, // <-- Aba de Cadastros adicionada aqui
     { id: 'receita', label: 'Emitir Receita', icon: FileText },
     { id: 'agrofit', label: 'Consulta Agrofit', icon: Database },
   ];
@@ -134,7 +135,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, empre
       {menuMobileAberto && (
         <div className="md:hidden bg-white/95 backdrop-blur-md border-b border-emerald-200 px-4 pt-3 pb-4 space-y-3 shadow-lg">
           
-          {/* Seletor de Empresa para Celular (caso a tela seja muito pequena e esconda o sm) */}
+          {/* Seletor de Empresa para Celular */}
           <div className="flex sm:hidden flex-col space-y-1 bg-emerald-50/80 border border-emerald-200 p-2.5 rounded-lg">
             <div className="flex items-center space-x-1.5 text-xs font-semibold text-gray-600">
               <Building2 className="h-4 w-4 text-emerald-600 shrink-0" />
