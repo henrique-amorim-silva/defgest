@@ -120,7 +120,7 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
   const resumoConsolidado = estoque.reduce(
     (acc, item: any) => {
       const idProduto = item.id || item.produtoId || item.produto_id || "N/D";
-      const nome = item.nome_produto || item.nomeProduto || "Produto Sem Nome";
+      const nome = item.nome_produto || item.nomeProduto || item.produto || "Produto Sem Nome";
       const embalagem = item.embalagem || item.unidade || "UN";
       const unidade = item.unidade || "UN";
       const estoqueMinimo = Number(
@@ -142,34 +142,38 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
         };
       }
 
-      const lotesDoItem = item.lotes || [];
+      const lotesDoItem = Array.isArray(item.lotes) ? item.lotes : [];
 
-      lotesDoItem.forEach((loteItem: any) => {
-        const qtdLote = Number(
-          loteItem.quantidadeAtual ?? loteItem.quantidade_atual ?? 0,
-        );
-        const validadeOriginal =
-          loteItem.dataValidade || loteItem.data_validade || "";
-        const validadeFormatada = validadeOriginal
-          ? validadeOriginal.split("T")[0]
-          : "-";
-        const notaFiscal =
-          loteItem.numeroNotaFiscal ||
-          loteItem.notaFiscal ||
-          loteItem.nota_fiscal ||
-          loteItem.nf ||
-          "N/D";
+      if (lotesDoItem.length === 0) {
+        acc[chave].lotesDetalhados = [];
+      } else {
+        lotesDoItem.forEach((loteItem: any) => {
+          const qtdLote = Number(
+            loteItem.quantidadeAtual ?? loteItem.quantidade_atual ?? loteItem.quantidade ?? 0,
+          );
+          const validadeOriginal =
+            loteItem.dataValidade || loteItem.data_validade || "";
+          const validadeFormatada = validadeOriginal
+            ? validadeOriginal.split("T")[0]
+            : "-";
+          const notaFiscal =
+            loteItem.numeroNotaFiscal ||
+            loteItem.notaFiscal ||
+            loteItem.nota_fiscal ||
+            loteItem.nf ||
+            "N/D";
 
-        acc[chave].quantidadeTotal += qtdLote;
+          acc[chave].quantidadeTotal += qtdLote;
 
-        acc[chave].lotesDetalhados.push({
-          lote: loteItem.lote || "N/D",
-          quantidade: qtdLote,
-          validade: validadeFormatada,
-          vencido: isVencido(validadeOriginal),
-          notaFiscal: notaFiscal,
+          acc[chave].lotesDetalhados.push({
+            lote: loteItem.lote || "N/D",
+            quantidade: qtdLote,
+            validade: validadeFormatada,
+            vencido: isVencido(validadeOriginal),
+            notaFiscal: notaFiscal,
+          });
         });
-      });
+      }
 
       return acc;
     },
@@ -433,7 +437,7 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
             </div>
           ) : (
             <>
-              {/* Layout Mobile: Cartões Verticais (Igual ao Computador) */}
+              {/* Layout Mobile: Cartões Verticais */}
               <div className="block md:hidden space-y-3">
                 {listaConsolidada.map((item: any) => {
                   const abaixoDoMinimo = item.quantidadeTotal <= item.estoqueMinimo;
@@ -473,7 +477,7 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
                         </div>
                       )}
 
-                      {/* Lotes Detalhados / Mensagem idêntica ao desktop */}
+                      {/* Lotes Detalhados no Mobile */}
                       <div className="pt-2 border-t border-gray-200 space-y-1.5 text-xs">
                         {item.lotesDetalhados.length === 0 ? (
                           <span className="text-gray-400 italic">
