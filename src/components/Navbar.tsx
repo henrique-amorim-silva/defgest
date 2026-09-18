@@ -39,11 +39,12 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, empre
     }
   }, [isAdminMaster]);
 
+  // 'inventario' foi removido daqui para limpar o menu superior (agora é acessado via botão na tela de Estoque)
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'estoque', label: 'Estoque', icon: Package },
     { id: 'entrada', label: 'Entrada de Nota', icon: FilePlus },
-    { id: 'cadastros', label: 'Cadastros', icon: Users }, // <-- Aba de Cadastros adicionada aqui
+    { id: 'cadastros', label: 'Cadastros', icon: Users },
     { id: 'receita', label: 'Emitir Receita', icon: FileText },
     { id: 'agrofit', label: 'Consulta Agrofit', icon: Database },
   ];
@@ -59,7 +60,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, empre
       <div className="max-w-350 mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-3">
           
-          {/* Logo e Seletor de Empresa (Desktop) */}
           <div className="flex items-center space-x-3 shrink-0">
             <div className="flex items-center space-x-2 cursor-pointer" onClick={() => { setCurrentTab('dashboard'); setMenuMobileAberto(false); }}>
               <img 
@@ -69,7 +69,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, empre
               />
             </div>
 
-            {/* Seletor de Empresa / Indicador (Visível em sm+) */}
             <div className="hidden sm:flex items-center space-x-1.5 bg-white/80 border border-emerald-200 px-2.5 py-1.5 rounded-lg shadow-sm">
               <Building2 className="h-4 w-4 text-emerald-600 shrink-0" />
               {isAdminMaster ? (
@@ -96,8 +95,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, empre
             </div>
           </div>
 
-          {/* Navegação Desktop */}
-          <nav className="hidden md:flex items-center space-x-1">
+          <nav className="hidden md:flex items-center space-x-1 overflow-x-auto py-1">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = currentTab === item.id;
@@ -118,7 +116,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, empre
             })}
           </nav>
 
-          {/* Botão do Menu Hambúrguer (Aparece em telas menores que md) */}
           <div className="flex items-center md:hidden">
             <button
               onClick={() => setMenuMobileAberto(!menuMobileAberto)}
@@ -131,11 +128,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, empre
         </div>
       </div>
 
-      {/* Menu Dropdown Mobile */}
       {menuMobileAberto && (
         <div className="md:hidden bg-white/95 backdrop-blur-md border-b border-emerald-200 px-4 pt-3 pb-4 space-y-3 shadow-lg">
-          
-          {/* Seletor de Empresa para Celular */}
           <div className="flex sm:hidden flex-col space-y-1 bg-emerald-50/80 border border-emerald-200 p-2.5 rounded-lg">
             <div className="flex items-center space-x-1.5 text-xs font-semibold text-gray-600">
               <Building2 className="h-4 w-4 text-emerald-600 shrink-0" />
@@ -161,7 +155,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, empre
             )}
           </div>
 
-          {/* Links de Navegação Mobile */}
           <div className="flex flex-col space-y-1">
             {navItems.map((item) => {
               const Icon = item.icon;

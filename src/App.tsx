@@ -8,10 +8,10 @@ import { ConsultaAgrofit } from "./pages/ConsultaAgrofit";
 import { Login } from "./pages/Login";
 import { GerenciamentoUsuarios } from "./pages/GerenciamentoUsuarios";
 import Cadastros from "./pages/Cadastros";
+import { ContagemEstoque } from "./components/ContagemEstoque";
 import { LogOut } from "lucide-react";
 
 export function App() {
-  // 1. Inicializa o estado lendo do localStorage (ou define 'dashboard' como padrão)
   const [currentTab, setCurrentTab] = useState<string>(() => {
     return localStorage.getItem("defgest_aba_ativa") || "dashboard";
   });
@@ -26,7 +26,6 @@ export function App() {
     }
   }, []);
 
-  // 2. Sempre que a aba mudar, salvamos o valor atualizado no localStorage
   const handleTrocarTab = (tab: string) => {
     setCurrentTab(tab);
     localStorage.setItem("defgest_aba_ativa", tab);
@@ -35,7 +34,7 @@ export function App() {
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("usuario");
-    localStorage.removeItem("defgest_aba_ativa"); // Opcional: limpa a aba salva ao sair
+    localStorage.removeItem("defgest_aba_ativa");
     setToken(null);
     setEmpresaSelecionada("");
   };
@@ -56,9 +55,21 @@ export function App() {
           />
         );
       case "estoque":
-        return <Estoque empresaSelecionada={empresaSelecionada} />;
+        return (
+          <Estoque 
+            empresaSelecionada={empresaSelecionada} 
+            setCurrentTab={handleTrocarTab} 
+          />
+        );
       case "entrada":
         return <EntradaNota empresaSelecionada={empresaSelecionada} />;
+      case "inventario":
+        return (
+          <ContagemEstoque 
+            empresaSelecionada={empresaSelecionada} 
+            onFechar={() => handleTrocarTab("estoque")} 
+          />
+        );
       case "receita":
         return <EmissaoReceita />;
       case "agrofit":
@@ -90,15 +101,14 @@ export function App() {
       </div>
       <Navbar
         currentTab={currentTab}
-        setCurrentTab={handleTrocarTab} // Substituído para usar a função que persiste
+        setCurrentTab={handleTrocarTab}
         empresaSelecionada={empresaSelecionada}
         setEmpresaSelecionada={setEmpresaSelecionada}
       />
 
       <main className="flex-1">{renderScreen()}</main>
       <footer className="bg-white border-t border-gray-200 py-4 text-center text-xs text-gray-500">
-        DEFGEST &copy; 2026 - Sistema de Controle de Estoque e Receituário
-        Agronômico[cite: 5]
+        DEFGEST &copy; 2026 - Sistema de Controle de Estoque e Receituário Agronômico
       </footer>
     </div>
   );

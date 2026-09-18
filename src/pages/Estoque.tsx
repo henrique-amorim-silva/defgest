@@ -7,14 +7,18 @@ import {
   Filter,
   AlertTriangle,
   CheckCircle,
+  ClipboardList,
+  Clock,
 } from "lucide-react";
 
 interface EstoqueProps {
   empresaSelecionada?: string;
+  setCurrentTab?: (tab: string) => void;
 }
 
-export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada }) => {
+export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrentTab }) => {
   const [estoque, setEstoque] = useState<ItemEstoque[]>([]);
+  const [temRascunhoPendente, setTemRascunhoPendente] = useState<boolean>(false);
 
   // Estados de Filtros
   const [filtroCodigo, setFiltroCodigo] = useState("");
@@ -36,6 +40,31 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada }) => {
     setDataFimValidade("");
     setOrdenacao("nome-asc");
   };
+
+  // Chave do localStorage alinhada com a ContagemEstoque
+  const chaveLocalStorage = `contagem_temporaria_empresa_${empresaSelecionada || 'geral'}`;
+
+  // Verificar se existe rascunho salvo ao carregar ou mudar de empresa
+  useEffect(() => {
+    const verificarRascunho = () => {
+      const salvo = localStorage.getItem(chaveLocalStorage);
+      if (salvo) {
+        try {
+          const itens = JSON.parse(salvo);
+          setTemRascunhoPendente(Array.isArray(itens) && itens.length > 0);
+        } catch {
+          setTemRascunhoPendente(false);
+        }
+      } else {
+        setTemRascunhoPendente(false);
+      }
+    };
+
+    verificarRascunho();
+    // Adicionar listener para atualizar caso mude em outra aba/momento
+    window.addEventListener("storage", verificarRascunho);
+    return () => window.removeEventListener("storage", verificarRascunho);
+  }, [chaveLocalStorage]);
 
   // Carregar dados da API do Backend respeitando a empresa selecionada
   useEffect(() => {
@@ -199,6 +228,12 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada }) => {
       return 0;
     });
 
+  const irParaContagem = () => {
+    if (setCurrentTab) {
+      setCurrentTab("inventario");
+    }
+  };
+
   return (
     <div className="max-w-auto mx-auto py-8 px-4">
       <div className="bg-white rounded-xl shadow-md overflow-hidden p-6 border border-emerald-100">
@@ -214,6 +249,30 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada }) => {
                 Resumo consolidado de estoque para tomada de decisão de compra.
               </p>
             </div>
+          </div>
+
+          {/* Botão Dinâmico de Inventário / Contagem */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={irParaContagem}
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-medium shadow-sm transition text-xs sm:text-sm ${
+                temRascunhoPendente
+                  ? "bg-amber-600 hover:bg-amber-700 text-white animate-pulse"
+                  : "bg-emerald-600 hover:bg-emerald-700 text-white"
+              }`}
+            >
+              {temRascunhoPendente ? (
+                <>
+                  <Clock className="h-4 w-4" />
+                  <span>Continuar Contagem (Pendente)</span>
+                </>
+              ) : (
+                <>
+                  <ClipboardList className="h-4 w-4" />
+                  <span>Iniciar Contagem</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
 
