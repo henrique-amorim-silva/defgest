@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { listarEstoque, type ItemEstoque } from '../services/estoqueApi';
-import { LayoutDashboard, Package, AlertTriangle, CheckCircle, ArrowUpRight, Loader2 } from 'lucide-react';
+import { listarEstoque } from '../services/estoqueApi';
+import { LayoutDashboard, Package, AlertTriangle, CheckCircle, ArrowUpRight, Loader2, TrendingDown,  } from 'lucide-react';
 
 interface DashboardProps {
   setCurrentTab: (tab: string) => void;
@@ -10,7 +10,8 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, empresaSelecionada }) => {
   const [totalProdutos, setTotalProdutos] = useState(0);
   const [totalLotes, setTotalLotes] = useState(0);
-  const [alertasVencimento, setAlertasVencimento] = useState<ItemEstoque[]>([]);
+  const [alertasVencimento, setAlertasVencimento] = useState<any[]>([]);
+  const [alertasEstoqueMinimo, setAlertasEstoqueMinimo] = useState<any[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -23,37 +24,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, empresaSele
         // Busca o estoque real do backend filtrando pela empresa selecionada (se houver)
         const estoque = await listarEstoque(empresaSelecionada);
 
-        setTotalLotes(estoque.length);
-        
-        // Conta produtos únicos de forma segura
-        const produtosUnicos = new Set(
-          estoque.map((i: any) => {
-            const nome = i.nomeProduto || i.nome_produto || i.produto || i.descricao || '';
-            return nome.toString().trim().toLowerCase();
-          }).filter(Boolean)
-        ).size;
-        
-        setTotalProdutos(produtosUnicos);
+        let contadorLotesTotal = 0;
+        const listaVencimentos: any[] = [];
+        const listaEstoqueBaixo: any[] = [];
 
-        // Função auxiliar para converter diferentes formatos de data da API (ISO ou DD/MM/AAAA) para objeto Date
-        const parseDataValidade = (item: any) => {
-          const valorBruto = item.dataValidade || item.data_validade || item.validade || item.dataVal;
-          if (!valorBruto) return null;
-
-          // Se já for uma string no formato DD/MM/AAAA (ex: "10/10/2026")
-          if (typeof valorBruto === 'string' && valorBruto.includes('/')) {
-            const [dia, mes, ano] = valorBruto.split('/');
-            if (dia && mes && ano) {
-              return new Date(Number(ano), Number(mes) - 1, Number(dia));
-            }
-          }
-
-          // Tenta o parser padrão do JS
-          const dataParsed = new Date(valorBruto);
-          return isNaN(dataParsed.getTime()) ? null : dataParsed;
-        };
-
-        // Identificar lotes vencendo nos próximos 30 dias ou já vencidos
+        // Datas de referência para cálculo de vencimento (Próximos 30 dias ou já vencidos)
         const hoje = new Date();
         hoje.setHours(0, 0, 0, 0);
 
@@ -61,14 +36,85 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, empresaSele
         trintaDiasFrente.setDate(hoje.getDate() + 30);
         trintaDiasFrente.setHours(23, 59, 59, 999);
 
-        const lotesAlerta = estoque.filter((item: any) => {
-          const dataVal = parseDataValidade(item);
-          if (!dataVal) return false;
-          // Retorna verdadeiro se a data de validade for menor ou igual a 30 dias a partir de hoje
-          return dataVal <= trintaDiasFrente;
+        // Função auxiliar para interpretar a data de validade com segurança
+        const parseDataValidade = (valorBruto: any) => {
+          if (!valorBruto) return null;
+          if (typeof valorBruto === 'string' && valorBruto.includes('/')) {
+            const [dia, mes, ano] = valorBruto.split('/');
+            if (dia && mes && ano) {
+              return new Date(Number(ano), Number(mes) - 1, Number(dia));
+            }
+          }
+          const dataParsed = new Date(valorBruto);
+          return isNaN(dataParsed.getTime()) ? null : dataParsed;
+        };
+
+        // Itera sobre os produtos e seus respectivos lotes vindos da nova estrutura
+        estoque.forEach((item: any) => {
+          const nomeProd = item.nomeProduto || item.nome_produto || item.produto || item.descricao || 'Produto sem nome';
+          const unidadeMedida = item.embalagem || item.unidade || item.unidade_medida || 'UN';
+          const estoqueMinimo = Number(item.est_min ?? item.estoque_minimo ?? item.estoqueMinimo ?? 0);
+          
+          let quantidadeTotalProduto = 0;
+          const lotesDoItem = item.lotes || [];
+
+          contadorLotesTotal += lotesDoItem.length;
+
+          // Analisa cada lote individualmente para alertas de validade
+          lotesDoItem.forEach((loteItem: any) => {
+            const qtdLote = Number(loteItem.quantidadeAtual ?? loteItem.quantidade_atual ?? 0);
+            quantidadeTotalProduto += qtdLote;
+
+            const dataValBruta = loteItem.dataValidade || loteItem.data_validade || loteItem.validade;
+            const dataVal = parseDataValidade(dataValBruta);
+
+            if (dataVal) {
+              // Verifica se está vencido ou vence nos próximos 30 dias
+              if (dataVal <= trintaDiasFrente) {
+                let dataValFormatada = dataValBruta;
+                if (typeof dataValFormatada === 'string' && dataValFormatada.includes('T')) {
+                  const [ano, mes, dia] = dataValFormatada.split('T')[0].split('-');
+                  if (ano && mes && dia) dataValFormatada = `${dia}/${mes}/${ano}`;
+                }
+
+                listaVencimentos.push({
+                  idLote: loteItem.id || Math.random(),
+                  nomeProduto: nomeProd,
+                  lote: loteItem.lote || 'N/D',
+                  quantidade: qtdLote,
+                  unidade: unidadeMedida,
+                  dataValidade: dataValFormatada || 'Não informada',
+                  vencido: dataVal < hoje,
+                });
+              }
+            }
+          });
+
+          // Verifica alerta de Estoque Mínimo (Quantidade total <= Estoque Mínimo)
+          if (quantidadeTotalProduto <= estoqueMinimo) {
+            listaEstoqueBaixo.push({
+              idProduto: item.id || item.produtoId || Math.random(),
+              nomeProduto: nomeProd,
+              quantidadeTotal: quantidadeTotalProduto,
+              estoqueMinimo: estoqueMinimo,
+              unidade: unidadeMedida,
+            });
+          }
         });
 
-        setAlertasVencimento(lotesAlerta);
+        // Conta produtos únicos
+        const produtosUnicos = new Set(
+          estoque.map((i: any) => {
+            const nome = i.nomeProduto || i.nome_produto || i.produto || i.descricao || '';
+            return nome.toString().trim().toLowerCase();
+          }).filter(Boolean)
+        ).size;
+
+        setTotalProdutos(produtosUnicos);
+        setTotalLotes(contadorLotesTotal);
+        setAlertasVencimento(listaVencimentos);
+        setAlertasEstoqueMinimo(listaEstoqueBaixo);
+
       } catch (err: any) {
         setErro(err.message || 'Erro ao carregar dados do dashboard.');
       } finally {
@@ -111,7 +157,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, empresaSele
       </div>
 
       {/* Cards de Indicadores */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="bg-white p-6 rounded-xl shadow-md border border-emerald-100 flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-500">Lotes em Estoque</p>
@@ -141,75 +187,100 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, empresaSele
             <AlertTriangle className="h-6 w-6" />
           </div>
         </div>
+
+        <div className="bg-white p-6 rounded-xl shadow-md border border-emerald-100 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-500">Estoque Crítico / Mín.</p>
+            <p className="text-3xl font-bold text-red-600 mt-1">{alertasEstoqueMinimo.length}</p>
+          </div>
+          <div className="p-3 bg-red-50 rounded-full text-red-600">
+            <TrendingDown className="h-6 w-6" />
+          </div>
+        </div>
       </div>
 
-      {/* Ações Rápidas e Alertas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Ações Rápidas */}
-        <div className="bg-white p-6 rounded-xl shadow-md border border-emerald-100">
+      {/* Ações Rápidas */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="bg-white p-6 rounded-xl shadow-md border border-emerald-100 md:col-span-1">
           <h3 className="text-lg font-bold text-gray-800 mb-4">Ações Rápidas</h3>
           <div className="space-y-3">
             <button
-              onClick={() => setCurrentTab('entrada')}
-              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-emerald-50 rounded-lg transition text-gray-700 hover:text-emerald-800 border border-gray-200"
+              onClick={() => setCurrentTab('cadastros')}
+              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-emerald-50 rounded-lg transition text-gray-700 hover:text-emerald-800 border border-gray-200 text-sm"
             >
-              <span className="font-medium">Lançar Nova Nota Fiscal de Entrada</span>
-              <ArrowUpRight className="h-5 w-5" />
+              <span className="font-medium">Ir para Cadastros</span>
+              <ArrowUpRight className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setCurrentTab('entrada')}
+              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-emerald-50 rounded-lg transition text-gray-700 hover:text-emerald-800 border border-gray-200 text-sm"
+            >
+              <span className="font-medium">Lançar Nova Nota Fiscal</span>
+              <ArrowUpRight className="h-4 w-4" />
             </button>
             <button
               onClick={() => setCurrentTab('receita')}
-              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-emerald-50 rounded-lg transition text-gray-700 hover:text-emerald-800 border border-gray-200"
+              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-emerald-50 rounded-lg transition text-gray-700 hover:text-emerald-800 border border-gray-200 text-sm"
             >
-              <span className="font-medium">Emitir Nova Receita Agronômica</span>
-              <ArrowUpRight className="h-5 w-5" />
+              <span className="font-medium">Emitir Receita Agronômica</span>
+              <ArrowUpRight className="h-4 w-4" />
             </button>
             <button
               onClick={() => setCurrentTab('estoque')}
-              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-emerald-800 hover:text-white rounded-lg transition text-gray-700 border border-gray-200"
+              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-emerald-800 hover:text-white rounded-lg transition text-gray-700 border border-gray-200 text-sm"
             >
               <span className="font-medium">Consultar Estoque Atual</span>
-              <ArrowUpRight className="h-5 w-5" />
+              <ArrowUpRight className="h-4 w-4" />
             </button>
           </div>
         </div>
 
         {/* Lotes Próximos do Vencimento */}
-        <div className="bg-white p-6 rounded-xl shadow-md border border-emerald-100">
+        <div className="bg-white p-6 rounded-xl shadow-md border border-emerald-100 md:col-span-1">
           <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center space-x-2">
             <AlertTriangle className="h-5 w-5 text-amber-500" />
-            <span>Lotes Próximos do Vencimento</span>
+            <span>Validades Próximas</span>
           </h3>
           {alertasVencimento.length === 0 ? (
             <p className="text-sm text-gray-500 py-6 text-center">Nenhum lote com alerta de vencimento próximo.</p>
           ) : (
-            <div className="space-y-3 max-h-48 overflow-y-auto">
-              {alertasVencimento.map((item: any, idx: number) => {
-                // Trata as variações dos nomes dos campos vindos do backend
-                const nomeProd = item.nomeProduto || item.nome_produto || item.produto || item.descricao || 'Produto sem nome';
-                const loteNum = item.lote || item.numeroLote || item.lote_num || 'N/D';
-                const quantidade = item.quantidadeAtual ?? item.quantidade_atual ?? item.quantidade ?? 0;
-                const unidadeMedida = item.unidade || item.unidade_medida || '';
-                
-                // Trata a exibição da data de validade
-                let dataValFormatada = item.dataValidade || item.data_validade || item.validade || '';
-                if (dataValFormatada && dataValFormatada.includes('T')) {
-                  // Se vier em formato ISO (ex: 2026-10-10T00:00:00.000Z), converte para DD/MM/AAAA
-                  const [ano, mes, dia] = dataValFormatada.split('T')[0].split('-');
-                  if (ano && mes && dia) dataValFormatada = `${dia}/${mes}/${ano}`;
-                }
-
-                return (
-                  <div key={item.id || idx} className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex justify-between items-center text-sm">
-                    <div>
-                      <p className="font-semibold text-gray-900">{nomeProd}</p>
-                      <p className="text-xs text-gray-600">Lote: {loteNum} | Qtd: {quantidade} {unidadeMedida}</p>
-                    </div>
-                    <span className="text-xs font-bold bg-amber-200 text-amber-900 px-2 py-1 rounded whitespace-nowrap ml-2">
-                      Val: {dataValFormatada || 'Não informada'}
-                    </span>
+            <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
+              {alertasVencimento.map((item: any) => (
+                <div key={item.idLote} className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex justify-between items-center text-xs">
+                  <div>
+                    <p className="font-bold text-gray-900">{item.nomeProduto}</p>
+                    <p className="text-gray-600">Lote: {item.lote} | Qtd: {item.quantidade} {item.unidade}</p>
                   </div>
-                );
-              })}
+                  <span className={`font-bold px-2 py-1 rounded whitespace-nowrap ml-2 ${item.vencido ? 'bg-red-200 text-red-900' : 'bg-amber-200 text-amber-900'}`}>
+                    Val: {item.dataValidade}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Produtos Abaixo do Estoque Mínimo */}
+        <div className="bg-white p-6 rounded-xl shadow-md border border-emerald-100 md:col-span-1">
+          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center space-x-2">
+            <TrendingDown className="h-5 w-5 text-red-500" />
+            <span>Estoque Crítico (Mínimo)</span>
+          </h3>
+          {alertasEstoqueMinimo.length === 0 ? (
+            <p className="text-sm text-gray-500 py-6 text-center">Nenhum produto abaixo do estoque mínimo.</p>
+          ) : (
+            <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
+              {alertasEstoqueMinimo.map((item: any) => (
+                <div key={item.idProduto} className="p-3 bg-red-50 border border-red-200 rounded-lg flex justify-between items-center text-xs">
+                  <div>
+                    <p className="font-bold text-gray-900">{item.nomeProduto}</p>
+                    <p className="text-gray-600">Atual: <span className="font-bold text-red-700">{item.quantidadeTotal}</span> | Mín: {item.estoqueMinimo} {item.unidade}</p>
+                  </div>
+                  <span className="font-bold px-2 py-1 rounded whitespace-nowrap ml-2 bg-red-200 text-red-900">
+                    Repor
+                  </span>
+                </div>
+              ))}
             </div>
           )}
         </div>
