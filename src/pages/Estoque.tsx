@@ -433,7 +433,7 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
             </div>
           ) : (
             <>
-              {/* Layout Mobile: Cartões Verticais */}
+              {/* Layout Mobile: Cartões Verticais (Igual ao Computador) */}
               <div className="block md:hidden space-y-3">
                 {listaConsolidada.map((item: any) => {
                   const abaixoDoMinimo = item.quantidadeTotal <= item.estoqueMinimo;
@@ -473,28 +473,45 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
                         </div>
                       )}
 
-                      {/* Lotes Detalhados no Mobile */}
-                      <div className="pt-2 border-t border-gray-200 space-y-1.5">
-                        <span className="text-[11px] font-bold text-gray-500 uppercase">Lotes:</span>
+                      {/* Lotes Detalhados / Mensagem idêntica ao desktop */}
+                      <div className="pt-2 border-t border-gray-200 space-y-1.5 text-xs">
                         {item.lotesDetalhados.length === 0 ? (
-                          <p className="text-xs text-gray-400 italic">Nenhum lote registrado.</p>
+                          <span className="text-gray-400 italic">
+                            Nenhum lote cadastrado ou estoque zerado.
+                          </span>
                         ) : (
                           item.lotesDetalhados.map((l: any, idx: number) => (
-                            <div key={idx} className="bg-white p-2 rounded border border-gray-200 text-xs space-y-1">
-                              <div className="flex justify-between font-medium">
-                                <span className="font-mono text-gray-800 font-bold">Lote: {l.lote}</span>
-                                <span className="text-emerald-700 font-bold">Qtd: {l.quantidade}</span>
-                              </div>
-                              <div className="flex justify-between text-gray-500 text-[11px]">
-                                <span>NF: {l.notaFiscal}</span>
-                                <span className="flex items-center gap-1">
-                                  Val: {l.validade}
-                                  {l.vencido ? (
-                                    <span className="text-red-600 font-bold">Vencido</span>
-                                  ) : (
-                                    <span className="text-emerald-600">No prazo</span>
-                                  )}
+                            <div
+                              key={idx}
+                              className="flex flex-wrap items-center justify-between gap-1 bg-white px-2.5 py-1.5 rounded border border-gray-200"
+                            >
+                              <div className="flex items-center space-x-2">
+                                <span className="font-mono font-bold text-gray-700">
+                                  Lote: {l.lote}
                                 </span>
+                                <span className="text-emerald-700 font-semibold">
+                                  ({l.quantidade})
+                                </span>
+                                <span className="text-gray-400">|</span>
+                                <span className="text-gray-600 font-medium">
+                                  NF: {l.notaFiscal || "N/D"}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-gray-400">
+                                  Val: {l.validade}
+                                </span>
+                                {l.vencido ? (
+                                  <span className="text-red-600 font-bold flex items-center space-x-0.5">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    <span>Vencido</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-emerald-600 flex items-center space-x-0.5">
+                                    <CheckCircle className="h-3 w-3" />
+                                    <span>No prazo</span>
+                                  </span>
+                                )}
                               </div>
                             </div>
                           ))
