@@ -93,6 +93,13 @@ export async function excluirNotaFiscalCompleta(id: number): Promise<void> {
   return await apiRequest(`/notas-fiscais/${id}`, {
     method: 'DELETE',
   });
+}
 
-
+export async function verificarContagemTemporaria(empresaId: string): Promise<any> {
+  try {
+    return await apiRequest(`/contagem-temporaria/${empresaId}`);
+  } catch (error) {
+    console.error("Erro ao buscar contagem temporária:", error);
+    return null;
+  }
 }

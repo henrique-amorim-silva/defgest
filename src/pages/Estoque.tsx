@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useMemo } from "react";
 import type { ItemEstoque } from "../@types/estoque";
-import { listarEstoque } from '../services/estoqueApi';
+import {
+  listarEstoque,
+  verificarContagemTemporaria,
+} from "../services/estoqueApi";
 import {
   Package,
   Search,
@@ -19,9 +22,13 @@ interface EstoqueProps {
   setCurrentTab?: (tab: string) => void;
 }
 
-export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrentTab }) => {
+export const Estoque: React.FC<EstoqueProps> = ({
+  empresaSelecionada,
+  setCurrentTab,
+}) => {
   const [estoque, setEstoque] = useState<ItemEstoque[]>([]);
-  const [temRascunhoPendente, setTemRascunhoPendente] = useState<boolean>(false);
+  const [temRascunhoPendente, setTemRascunhoPendente] =
+    useState<boolean>(false);
 
   // Estado para controlar se os filtros começam recolhidos por padrão
   const [filtrosAbertos, setFiltrosAbertos] = useState<boolean>(false);
@@ -47,43 +54,81 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
     setOrdenacao("nome-asc");
   };
 
-  // Chave do localStorage alinhada com a ContagemEstoque
-  const chaveLocalStorage = `contagem_temporaria_empresa_${empresaSelecionada || 'geral'}`;
-
-  // Verificar se existe rascunho salvo ao carregar ou mudar de empresa
+  // Verificar se existe contagem pendente no Banco de Dados
   useEffect(() => {
-    const verificarRascunho = () => {
-      const salvo = localStorage.getItem(chaveLocalStorage);
-      if (salvo) {
+    let isMounted = true;
+
+    const verificarContagemPendente = async () => {
+      let existeRascunho = false;
+
+      // 1. Tenta pegar da propriedade ou do localStorage direto
+      let empresaIdEfetivo =
+        empresaSelecionada || localStorage.getItem("empresaId") || "";
+
+      // 2. Se ainda não achou, tenta extrair de dentro do objeto de usuário logado no localStorage
+      if (!empresaIdEfetivo) {
         try {
-          const itens = JSON.parse(salvo);
-          setTemRascunhoPendente(Array.isArray(itens) && itens.length > 0);
-        } catch {
-          setTemRascunhoPendente(false);
+          const usuarioStr =
+            localStorage.getItem("user") || localStorage.getItem("usuario");
+          if (usuarioStr) {
+            const usuarioObj = JSON.parse(usuarioStr);
+            empresaIdEfetivo =
+              usuarioObj.empresa_id || usuarioObj.empresaId || "";
+          }
+        } catch (e) {
+          console.error("Erro ao ler dados do usuário no localStorage", e);
         }
-      } else {
-        setTemRascunhoPendente(false);
+      }
+
+      if (empresaIdEfetivo) {
+        try {
+          const dadosBanco =
+            await verificarContagemTemporaria(empresaIdEfetivo);
+
+          // Aceita tanto dadosBanco.itens_json quanto dadosBanco.itens
+          const payloadItens = dadosBanco?.itens_json || dadosBanco?.itens;
+
+          if (payloadItens) {
+            const itens =
+              typeof payloadItens === "string"
+                ? JSON.parse(payloadItens)
+                : payloadItens;
+
+            if (Array.isArray(itens) && itens.length > 0) {
+              existeRascunho = true;
+            }
+          }
+        } catch (error) {
+          // Caso retorne 404 ou erro porque não há rascunho, apenas mantém como falso
+          existeRascunho = false;
+        }
+      }
+
+      if (isMounted) {
+        setTemRascunhoPendente(existeRascunho);
       }
     };
 
-    verificarRascunho();
-    window.addEventListener("storage", verificarRascunho);
-    return () => window.removeEventListener("storage", verificarRascunho);
-  }, [chaveLocalStorage]);
+    verificarContagemPendente();
 
-// Carregar dados da API do Backend respeitando a empresa selecionada
- useEffect(() => {
-  const buscarEstoque = async () => {
-    try {
-      const dados = await listarEstoque(empresaSelecionada);
-      setEstoque(dados);
-    } catch (error) {
-      console.error("Erro de conexão com o servidor:", error);
-    }
-  };
+    return () => {
+      isMounted = false;
+    };
+  }, [empresaSelecionada]);
 
-  buscarEstoque();
-}, [empresaSelecionada]);
+  // Carregar dados da API do Backend respeitando a empresa selecionada
+  useEffect(() => {
+    const buscarEstoque = async () => {
+      try {
+        const dados = await listarEstoque(empresaSelecionada);
+        setEstoque(dados);
+      } catch (error) {
+        console.error("Erro de conexão com o servidor:", error);
+      }
+    };
+
+    buscarEstoque();
+  }, [empresaSelecionada]);
 
   // Função auxiliar para checar se o lote está vencido
   const isVencido = (dataValidade: string) => {
@@ -107,7 +152,11 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
   const resumoConsolidado = estoque.reduce(
     (acc, item: any) => {
       const idProduto = item.id || item.produtoId || item.produto_id || "N/D";
-      const nome = item.nome_produto || item.nomeProduto || item.produto || "Produto Sem Nome";
+      const nome =
+        item.nome_produto ||
+        item.nomeProduto ||
+        item.produto ||
+        "Produto Sem Nome";
       const embalagem = item.embalagem || item.unidade || "UN";
       const unidade = item.unidade || "UN";
       const estoqueMinimo = Number(
@@ -136,7 +185,10 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
       } else {
         lotesDoItem.forEach((loteItem: any) => {
           const qtdLote = Number(
-            loteItem.quantidadeAtual ?? loteItem.quantidade_atual ?? loteItem.quantidade ?? 0,
+            loteItem.quantidadeAtual ??
+              loteItem.quantidade_atual ??
+              loteItem.quantidade ??
+              0,
           );
           const validadeOriginal =
             loteItem.dataValidade || loteItem.data_validade || "";
@@ -419,7 +471,8 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
                 Nenhum produto encontrado no estoque.
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                Verifique se há filtros ativos ou se o inventário está cadastrado.
+                Verifique se há filtros ativos ou se o inventário está
+                cadastrado.
               </p>
             </div>
           ) : (
@@ -427,12 +480,15 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
               {/* Layout Mobile: Cartões Verticais */}
               <div className="block md:hidden space-y-3">
                 {listaConsolidada.map((item: any) => {
-                  const abaixoDoMinimo = item.quantidadeTotal <= item.estoqueMinimo;
+                  const abaixoDoMinimo =
+                    item.quantidadeTotal <= item.estoqueMinimo;
                   return (
                     <div
                       key={item.idUnico}
                       className={`p-3.5 rounded-xl border shadow-sm space-y-2.5 ${
-                        abaixoDoMinimo ? "bg-amber-50/60 border-amber-200" : "bg-gray-50/80 border-gray-200"
+                        abaixoDoMinimo
+                          ? "bg-amber-50/60 border-amber-200"
+                          : "bg-gray-50/80 border-gray-200"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -460,7 +516,9 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
                       {abaixoDoMinimo && (
                         <div className="flex items-center text-[11px] font-bold text-amber-800 bg-amber-100/70 px-2 py-1 rounded">
                           <AlertTriangle className="h-3 w-3 mr-1 text-amber-600 shrink-0" />
-                          <span>Estoque Crítico (Mínimo: {item.estoqueMinimo})</span>
+                          <span>
+                            Estoque Crítico (Mínimo: {item.estoqueMinimo})
+                          </span>
                         </div>
                       )}
 
@@ -581,41 +639,43 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
                                   Nenhum lote cadastrado ou estoque zerado.
                                 </span>
                               ) : (
-                                item.lotesDetalhados.map((l: any, idx: number) => (
-                                  <div
-                                    key={idx}
-                                    className="flex flex-wrap items-center justify-between gap-1 bg-gray-50 px-2.5 py-1.5 rounded border"
-                                  >
-                                    <div className="flex items-center space-x-2">
-                                      <span className="font-mono font-bold text-gray-700">
-                                        Lote: {l.lote}
-                                      </span>
-                                      <span className="text-emerald-700 font-semibold">
-                                        ({l.quantidade})
-                                      </span>
-                                      <span className="text-gray-400">|</span>
-                                      <span className="text-gray-600 font-medium">
-                                        NF: {l.notaFiscal || "N/D"}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                      <span className="text-gray-400">
-                                        Val: {l.validade}
-                                      </span>
-                                      {l.vencido ? (
-                                        <span className="text-red-600 font-bold flex items-center space-x-0.5">
-                                          <AlertTriangle className="h-3 w-3" />
-                                          <span>Vencido</span>
+                                item.lotesDetalhados.map(
+                                  (l: any, idx: number) => (
+                                    <div
+                                      key={idx}
+                                      className="flex flex-wrap items-center justify-between gap-1 bg-gray-50 px-2.5 py-1.5 rounded border"
+                                    >
+                                      <div className="flex items-center space-x-2">
+                                        <span className="font-mono font-bold text-gray-700">
+                                          Lote: {l.lote}
                                         </span>
-                                      ) : (
-                                        <span className="text-emerald-600 flex items-center space-x-0.5">
-                                          <CheckCircle className="h-3 w-3" />
-                                          <span>No prazo</span>
+                                        <span className="text-emerald-700 font-semibold">
+                                          ({l.quantidade})
                                         </span>
-                                      )}
+                                        <span className="text-gray-400">|</span>
+                                        <span className="text-gray-600 font-medium">
+                                          NF: {l.notaFiscal || "N/D"}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center space-x-2">
+                                        <span className="text-gray-400">
+                                          Val: {l.validade}
+                                        </span>
+                                        {l.vencido ? (
+                                          <span className="text-red-600 font-bold flex items-center space-x-0.5">
+                                            <AlertTriangle className="h-3 w-3" />
+                                            <span>Vencido</span>
+                                          </span>
+                                        ) : (
+                                          <span className="text-emerald-600 flex items-center space-x-0.5">
+                                            <CheckCircle className="h-3 w-3" />
+                                            <span>No prazo</span>
+                                          </span>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
-                                ))
+                                  ),
+                                )
                               )}
                             </div>
                           </td>
