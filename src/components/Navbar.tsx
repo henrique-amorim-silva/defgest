@@ -39,7 +39,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, empre
     }
   }, [isAdminMaster]);
 
-  // 'inventario' foi removido daqui para limpar o menu superior (agora é acessado via botão na tela de Estoque)
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'estoque', label: 'Estoque', icon: Package },
@@ -69,6 +68,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, empre
               />
             </div>
 
+            {/* Bloco de Empresa visível em telas maiores para admin_master ou comum */}
             <div className="hidden sm:flex items-center space-x-1.5 bg-white/80 border border-emerald-200 px-2.5 py-1.5 rounded-lg shadow-sm">
               <Building2 className="h-4 w-4 text-emerald-600 shrink-0" />
               {isAdminMaster ? (
@@ -128,18 +128,19 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, empre
         </div>
       </div>
 
+      {/* Menu Mobile / Gaveta que garante a exibição do seletor de empresa e navegação */}
       {menuMobileAberto && (
         <div className="md:hidden bg-white/95 backdrop-blur-md border-b border-emerald-200 px-4 pt-3 pb-4 space-y-3 shadow-lg">
-          <div className="flex sm:hidden flex-col space-y-1 bg-emerald-50/80 border border-emerald-200 p-2.5 rounded-lg">
-            <div className="flex items-center space-x-1.5 text-xs font-semibold text-gray-600">
+          <div className="flex flex-col space-y-1 bg-emerald-50/80 border border-emerald-200 p-2.5 rounded-lg">
+            <div className="flex items-center space-x-1.5 text-xs font-semibold text-gray-600 mb-1">
               <Building2 className="h-4 w-4 text-emerald-600 shrink-0" />
-              <span>Empresa Atual:</span>
+              <span>Empresa Atual / Seleção:</span>
             </div>
             {isAdminMaster ? (
               <select
                 value={empresaSelecionada || ''}
                 onChange={(e) => setEmpresaSelecionada && setEmpresaSelecionada(e.target.value)}
-                className="text-xs font-medium text-emerald-900 bg-white border border-emerald-300 rounded px-2 py-1.5 outline-none w-full"
+                className="text-xs font-medium text-emerald-900 bg-white border border-emerald-300 rounded px-2 py-1.5 outline-none w-full cursor-pointer"
               >
                 <option value="">Todas as Empresas</option>
                 {empresas.map((emp) => (
