@@ -61,6 +61,8 @@ export interface NotaFiscalHistorico {
   dataEntrada: string;
   empresaId?: number;
   usuarioNome?: string;
+  fornecedorId?: number | string;
+  fornecedorNome?: string;
   itens: ItemNotaHistorico[];
 }
 
@@ -69,9 +71,15 @@ export async function listarNotasFiscais(empresaId?: string): Promise<NotaFiscal
   return await apiRequest(`/notas-fiscais${query}`);
 }
 
+export async function listarFornecedores(empresaId?: string): Promise<any[]> {
+  const query = empresaId ? `?empresaId=${empresaId}` : '';
+  return await apiRequest(`/fornecedores${query}`); // Ajuste a rota se necessário conforme a sua API
+}
+
 export async function salvarNotaFiscalCompleta(dados: {
   numeroNota: string;
   dataEntrada: string;
+  fornecedorId?: number | null; // Adicionado aqui
   itens: any[];
   notaEmEdicaoId?: string | null;
 }): Promise<any> {
@@ -85,4 +93,6 @@ export async function excluirNotaFiscalCompleta(id: number): Promise<void> {
   return await apiRequest(`/notas-fiscais/${id}`, {
     method: 'DELETE',
   });
+
+
 }

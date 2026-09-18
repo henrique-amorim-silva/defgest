@@ -6,6 +6,7 @@ import {
   listarNotasFiscais, 
   salvarNotaFiscalCompleta, 
   excluirNotaFiscalCompleta, 
+  listarFornecedores,
   type NotaFiscalHistorico, 
 } from "../services/estoqueApi";
 import { FilePlus, Search, Trash2, Edit, ArrowLeft, History, PackagePlus, PlusCircle } from "lucide-react";
@@ -27,7 +28,7 @@ interface EntradaNotaProps {
 
 const formatarData = (dataStr: string) => {
   if (!dataStr) return "-";
-  const dataLimpa = dataStr.split("T")[0]; // Remove a parte da hora (T03:00:00.000Z)
+  const dataLimpa = dataStr.split("T")[0];
   const partes = dataLimpa.split("-");
   if (partes.length === 3) {
     const [ano, mes, dia] = partes;
@@ -36,7 +37,6 @@ const formatarData = (dataStr: string) => {
   return dataStr;
 };
 
-// Função auxiliar para isolar apenas a parte YYYY-MM-DD para inputs de tipo date
 const formatarDataParaInput = (dataStr: string) => {
   if (!dataStr) return new Date().toISOString().split("T")[0];
   return dataStr.split("T")[0];
@@ -50,6 +50,8 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
   // Estados do Cabeçalho da Nota
   const [numeroNota, setNumeroNota] = useState("");
   const [dataEntradaNota, setDataEntradaNota] = useState(new Date().toISOString().split("T")[0]);
+  const [fornecedorId, setFornecedorId] = useState("");
+  const [listaFornecedores, setListaFornecedores] = useState<any[]>([]);
 
   // Lista de itens adicionados na nota atual
   const [itensNota, setItensNota] = useState<ItemNotaTemporario[]>([]);
@@ -75,6 +77,9 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
       setListaNotas(notas);
       const catalogo = await sincronizarCatalogoAgrofit();
       setProdutosDisponiveis(catalogo);
+
+      const fornecedores = await listarFornecedores(empresaSelecionada);
+      setListaFornecedores(fornecedores || []);
     } catch (error) {
       console.error("Erro ao carregar dados iniciais:", error);
     }
@@ -84,6 +89,7 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
     setNotaEmEdicaoId(null);
     setNumeroNota("");
     setDataEntradaNota(new Date().toISOString().split("T")[0]);
+    setFornecedorId("");
     setItensNota([]);
     limparCamposItem();
     setModo('formulario');
@@ -91,8 +97,10 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
     try {
       const catalogo = await sincronizarCatalogoAgrofit();
       setProdutosDisponiveis(catalogo);
+      const fornecedores = await listarFornecedores(empresaSelecionada);
+      setListaFornecedores(fornecedores || []);
     } catch (error) {
-      console.error("Erro ao carregar catálogo Agrofit:", error);
+      console.error("Erro ao carregar dados auxiliares:", error);
     }
   };
 
@@ -167,6 +175,7 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
       await salvarNotaFiscalCompleta({
         numeroNota,
         dataEntrada: dataEntradaNota,
+        fornecedorId: fornecedorId ? Number(fornecedorId) : null,
         itens: itensNota,
         notaEmEdicaoId,
       });
@@ -190,12 +199,14 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
   };
 
   const handleEditarNota = async (nota: NotaFiscalHistorico) => {
-    setNotaEmEdicaoId(String(nota.id)); // CORRIGIDO: Passa o ID interno da nota, e não o número dela
+    setNotaEmEdicaoId(String(nota.id));
     setNumeroNota(nota.numeroNota);
-    
     setDataEntradaNota(formatarDataParaInput(nota.dataEntrada));
+    setFornecedorId(nota.fornecedorId ? String(nota.fornecedorId) : "");
 
     const catalogo = await sincronizarCatalogoAgrofit();
+    const fornecedores = await listarFornecedores(empresaSelecionada);
+    setListaFornecedores(fornecedores || []);
 
     const itensTempCarregados: ItemNotaTemporario[] = nota.itens.map((item: any) => {
       const prodEncontrado = catalogo.find(p => p.nomeComercial.toLowerCase() === item.nomeProduto.toLowerCase()) || {
@@ -260,6 +271,7 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100 text-gray-600 text-sm">
                   <th className="p-4 font-semibold">Número NF</th>
+                  <th className="p-4 font-semibold">Fornecedor</th>
                   <th className="p-4 font-semibold">Data Entrada</th>
                   <th className="p-4 font-semibold">Itens</th>
                   <th className="p-4 font-semibold text-right">Ações</th>
@@ -268,7 +280,7 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
               <tbody className="divide-y divide-gray-100">
                 {listaNotas.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="p-6 text-center text-gray-500">
+                    <td colSpan={5} className="p-6 text-center text-gray-500">
                       Nenhuma nota fiscal registrada.
                     </td>
                   </tr>
@@ -276,6 +288,7 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
                   listaNotas.map((nota) => (
                     <tr key={nota.id} className="hover:bg-gray-50/50">
                       <td className="p-4 font-medium text-gray-800">{nota.numeroNota}</td>
+                      <td className="p-4 text-gray-600">{nota.fornecedorNome || "-"}</td>
                       <td className="p-4 text-gray-600">{formatarData(nota.dataEntrada)}</td>
                       <td className="p-4 text-gray-600">{nota.itens?.length || 0} item(ns)</td>
                       <td className="p-4 text-right space-x-2">
@@ -311,12 +324,12 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
               <ArrowLeft className="w-5 h-5" /> Voltar para Listagem
             </button>
             <h1 className="text-2xl font-bold text-gray-800">
-              {notaEmEdicaoId ? `Editando NF: ${notaEmEdicaoId}` : "Nova Entrada de Nota Fiscal"}
+              {notaEmEdicaoId ? `Editando NF: ${numeroNota}` : "Nova Entrada de Nota Fiscal"}
             </h1>
           </div>
 
           <form onSubmit={handleSubmitNota} className="space-y-6">
-            <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Número da Nota Fiscal *</label>
                 <input
@@ -327,6 +340,21 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
                   placeholder="Ex: 123456"
                   required
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fornecedor</label>
+                <select
+                  value={fornecedorId}
+                  onChange={(e) => setFornecedorId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
+                >
+                  <option value="">Selecione um fornecedor...</option>
+                  {listaFornecedores.map((f: any) => (
+                    <option key={f.id} value={f.id}>
+                      {f.nome || f.razaoSocial || f.razao_social}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data de Entrada *</label>
@@ -544,7 +572,6 @@ export const EntradaNota: React.FC<EntradaNotaProps> = ({ empresaSelecionada }) 
                           </td>
                         </tr>
                       ) : (
-                        /* CORREÇÃO DO ERRO: Removido o 'itensNota.pop &&' incorreto */
                         itensNota.map((item: ItemNotaTemporario) => (
                           <tr key={item.idTemp}>
                             <td className="p-3 font-medium text-gray-800">{item.produto.nomeComercial}</td>
