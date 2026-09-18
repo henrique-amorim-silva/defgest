@@ -9,6 +9,8 @@ import {
   CheckCircle,
   ClipboardList,
   Clock,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 interface EstoqueProps {
@@ -19,6 +21,9 @@ interface EstoqueProps {
 export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrentTab }) => {
   const [estoque, setEstoque] = useState<ItemEstoque[]>([]);
   const [temRascunhoPendente, setTemRascunhoPendente] = useState<boolean>(false);
+
+  // Estado para controlar se os filtros começam recolhidos por padrão
+  const [filtrosAbertos, setFiltrosAbertos] = useState<boolean>(false);
 
   // Estados de Filtros
   const [filtroCodigo, setFiltroCodigo] = useState("");
@@ -61,7 +66,6 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
     };
 
     verificarRascunho();
-    // Adicionar listener para atualizar caso mude em outra aba/momento
     window.addEventListener("storage", verificarRascunho);
     return () => window.removeEventListener("storage", verificarRascunho);
   }, [chaveLocalStorage]);
@@ -235,14 +239,14 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
   };
 
   return (
-    <div className="max-w-auto mx-auto py-8 px-4">
-      <div className="bg-white rounded-xl shadow-md overflow-hidden p-6 border border-emerald-100">
+    <div className="max-w-auto mx-auto py-4 sm:py-8 px-2 sm:px-4">
+      <div className="bg-white rounded-xl shadow-md overflow-hidden p-4 sm:p-6 border border-emerald-100">
         {/* Cabeçalho */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 border-b pb-4 gap-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 sm:mb-6 border-b pb-4 gap-4">
           <div className="flex items-center space-x-3">
-            <Package className="h-7 w-7 text-emerald-600" />
+            <Package className="h-7 w-7 text-emerald-600 shrink-0" />
             <div>
-              <h2 className="text-xl font-bold text-gray-800">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-800">
                 Controle de Estoque de Defensivos
               </h2>
               <p className="text-xs text-gray-500">
@@ -251,11 +255,10 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
             </div>
           </div>
 
-          {/* Botão Dinâmico de Inventário / Contagem */}
           <div className="flex items-center gap-3">
             <button
               onClick={irParaContagem}
-              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-medium shadow-sm transition text-xs sm:text-sm ${
+              className={`w-full sm:w-auto flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl font-medium shadow-sm transition text-xs sm:text-sm ${
                 temRascunhoPendente
                   ? "bg-amber-600 hover:bg-amber-700 text-white animate-pulse"
                   : "bg-emerald-600 hover:bg-emerald-700 text-white"
@@ -276,249 +279,345 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
           </div>
         </div>
 
-        {/* Bloco de Filtros Avançados */}
-        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6 space-y-4">
-          <div className="flex items-center space-x-2 text-xs font-bold text-gray-700 uppercase tracking-wider">
-            <Filter className="h-4 w-4 text-emerald-600" />
-            <span>Filtros de Busca</span>
-            <button
-              type="button"
-              onClick={limparFiltros}
-              className="px-3 py-1.5 ml-auto bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md text-xs font-semibold transition flex items-center space-x-1"
-            >
-              <span>Limpar Filtros</span>
-            </button>
+        {/* Bloco de Filtros Colapsável (Recolhido por padrão) */}
+        <div className="bg-gray-50 rounded-lg border border-gray-200 mb-6 overflow-hidden">
+          <div
+            onClick={() => setFiltrosAbertos(!filtrosAbertos)}
+            className="flex items-center justify-between p-3.5 cursor-pointer bg-gray-100/70 hover:bg-gray-200/50 transition select-none"
+          >
+            <div className="flex items-center space-x-2 text-xs font-bold text-gray-700 uppercase tracking-wider">
+              <Filter className="h-4 w-4 text-emerald-600" />
+              <span>Filtros de Busca Avançada</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-[11px] text-gray-500 font-medium">
+                {filtrosAbertos ? "Recolher" : "Expandir filtros"}
+              </span>
+              {filtrosAbertos ? (
+                <ChevronUp className="h-4 w-4 text-gray-600" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-gray-600" />
+              )}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Filtrar Código
-              </label>
-              <input
-                type="text"
-                placeholder="Ex: 14..."
-                value={filtroCodigo}
-                onChange={(e) => setFiltroCodigo(e.target.value)}
-                className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs bg-white focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
+          {filtrosAbertos && (
+            <div className="p-4 space-y-4 border-t border-gray-200 bg-white">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Filtrar Código
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 14..."
+                    value={filtroCodigo}
+                    onChange={(e) => setFiltroCodigo(e.target.value)}
+                    className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs bg-white focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Filtrar Produto
-              </label>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Nome do produto..."
-                  value={buscaProduto}
-                  onChange={(e) => setBuscaProduto(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-md text-xs bg-white focus:ring-2 focus:ring-emerald-500"
-                />
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Filtrar Produto
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Nome do produto..."
+                      value={buscaProduto}
+                      onChange={(e) => setBuscaProduto(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-md text-xs bg-white focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Filtrar Embalagem
+                  </label>
+                  <select
+                    value={filtroEmbalagem}
+                    onChange={(e) => setFiltroEmbalagem(e.target.value)}
+                    className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs bg-white focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="">Todas as embalagens</option>
+                    {embalagensDisponiveis.map((emb) => (
+                      <option key={emb} value={emb}>
+                        {emb}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Filtrar Lote
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Nº do lote..."
+                    value={filtroLote}
+                    onChange={(e) => setFiltroLote(e.target.value)}
+                    className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs bg-white focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Validade (Início)
+                  </label>
+                  <input
+                    type="date"
+                    value={dataInicioValidade}
+                    onChange={(e) => setDataInicioValidade(e.target.value)}
+                    className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs bg-white focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Validade (Fim)
+                  </label>
+                  <input
+                    type="date"
+                    value={dataFimValidade}
+                    onChange={(e) => setDataFimValidade(e.target.value)}
+                    className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs bg-white focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row justify-between items-center pt-3 border-t border-gray-200 gap-3">
+                <div className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-3">
+                  <span className="text-xs text-gray-500">Ordenação:</span>
+                  <select
+                    value={ordenacao}
+                    onChange={(e) =>
+                      setOrdenacao(
+                        e.target.value as "nome-asc" | "qtd-desc" | "qtd-asc",
+                      )
+                    }
+                    className="px-3 py-1.5 border border-gray-300 rounded-md text-xs bg-white focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="nome-asc">Nome (A - Z)</option>
+                    <option value="qtd-desc">Maior Quantidade Total</option>
+                    <option value="qtd-asc">Menor Quantidade Total</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={limparFiltros}
+                  className="w-full sm:w-auto px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md text-xs font-semibold transition"
+                >
+                  Limpar Filtros
+                </button>
               </div>
             </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Filtrar Embalagem
-              </label>
-              <select
-                value={filtroEmbalagem}
-                onChange={(e) => setFiltroEmbalagem(e.target.value)}
-                className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs bg-white focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="">Todas as embalagens</option>
-                {embalagensDisponiveis.map((emb) => (
-                  <option key={emb} value={emb}>
-                    {emb}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Filtrar Lote
-              </label>
-              <input
-                type="text"
-                placeholder="Nº do lote..."
-                value={filtroLote}
-                onChange={(e) => setFiltroLote(e.target.value)}
-                className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs bg-white focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Validade (Início)
-              </label>
-              <input
-                type="date"
-                value={dataInicioValidade}
-                onChange={(e) => setDataInicioValidade(e.target.value)}
-                className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs bg-white focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Validade (Fim)
-              </label>
-              <input
-                type="date"
-                value={dataFimValidade}
-                onChange={(e) => setDataFimValidade(e.target.value)}
-                className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs bg-white focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-            <div className="text-xs text-gray-500">
-              Ordenação geral dos registros:
-            </div>
-            <div className="w-56">
-              <select
-                value={ordenacao}
-                onChange={(e) =>
-                  setOrdenacao(
-                    e.target.value as "nome-asc" | "qtd-desc" | "qtd-asc",
-                  )
-                }
-                className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs bg-white focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="nome-asc">Nome (A - Z)</option>
-                <option value="qtd-desc">Maior Quantidade Total</option>
-                <option value="qtd-asc">Menor Quantidade Total</option>
-              </select>
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* CONTEÚDO: RESUMO CONSOLIDADO PARA COMPRAS */}
+        {/* CONTEÚDO DO ESTOQUE (Cartões no Mobile / Tabela no Desktop) */}
         <div>
           {listaConsolidada.length === 0 ? (
             <div className="text-center py-12">
               <Layers className="mx-auto h-12 w-12 text-gray-300 mb-3" />
-              <p className="text-gray-500 font-medium">
-                Nenhum produto encontrado com os filtros selecionados.
+              <p className="text-gray-500 font-medium text-sm">
+                Nenhum produto encontrado no estoque.
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                Verifique se há filtros ativos ou se o inventário está cadastrado.
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto border rounded-lg">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50 text-xs text-gray-600 uppercase">
-                  <tr>
-                    <th className="px-6 py-3 text-left w-24">Código</th>
-                    <th className="px-6 py-3 text-left">Produto</th>
-                    <th className="px-6 py-3 text-center">Embalagem</th>
-                    <th className="px-6 py-3 text-center">
-                      Qtd. Total em Estoque
-                    </th>
-                    <th className="px-6 py-3 text-center">Estoque Mínimo</th>
-                    <th className="px-6 py-3 text-left">
-                      Detalhamento dos Lotes
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200 text-sm">
-                  {listaConsolidada.map((item: any) => {
-                    const abaixoDoMinimo =
-                      item.quantidadeTotal <= item.estoqueMinimo;
-                    return (
-                      <tr
-                        key={item.idUnico}
-                        className={`hover:bg-gray-50 transition ${
-                          abaixoDoMinimo ? "bg-amber-50/40" : ""
-                        }`}
-                      >
-                        <td className="px-6 py-4 font-mono font-bold text-gray-600 text-center">
-                          {item.idProduto}
-                        </td>
-                        <td className="px-6 py-4 font-bold text-gray-900">
-                          <div className="flex items-center space-x-2">
-                            <span>{item.nomeProduto}</span>
-                            {abaixoDoMinimo && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                                <AlertTriangle className="h-3 w-3 mr-1 text-amber-600" />
-                                Estoque Crítico
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-center text-gray-700 font-medium">
-                          {item.embalagem}
-                        </td>
-                        <td className="px-6 py-4 text-center">
+            <>
+              {/* Layout Mobile: Cartões Verticais */}
+              <div className="block md:hidden space-y-3">
+                {listaConsolidada.map((item: any) => {
+                  const abaixoDoMinimo = item.quantidadeTotal <= item.estoqueMinimo;
+                  return (
+                    <div
+                      key={item.idUnico}
+                      className={`p-3.5 rounded-xl border shadow-sm space-y-2.5 ${
+                        abaixoDoMinimo ? "bg-amber-50/60 border-amber-200" : "bg-gray-50/80 border-gray-200"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="text-[10px] font-mono font-bold bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded">
+                            Cód: {item.idProduto}
+                          </span>
+                          <h3 className="font-bold text-gray-900 text-sm mt-1">
+                            {item.nomeProduto}
+                          </h3>
+                        </div>
+                        <div className="text-right shrink-0">
                           <span
-                            className={`font-bold px-3 py-1 rounded-full text-xs inline-flex items-center space-x-1 ${
+                            className={`font-bold px-2.5 py-1 rounded-full text-xs inline-block ${
                               abaixoDoMinimo
                                 ? "bg-amber-100 text-amber-800 border border-amber-300"
                                 : "bg-emerald-100 text-emerald-800"
                             }`}
                           >
-                            <span>{item.quantidadeTotal}</span>
+                            Qtd: {item.quantidadeTotal} {item.embalagem}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="text-gray-700 font-semibold text-xs">
-                            {item.estoqueMinimo}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="space-y-1.5 text-xs">
-                            {item.lotesDetalhados.length === 0 ? (
-                              <span className="text-gray-400 italic">
-                                Nenhum lote cadastrado ou estoque zerado.
-                              </span>
-                            ) : (
-                              item.lotesDetalhados.map((l: any, idx: number) => (
-                                <div
-                                  key={idx}
-                                  className="flex flex-wrap items-center justify-between gap-1 bg-gray-50 px-2.5 py-1.5 rounded border"
-                                >
-                                  <div className="flex items-center space-x-2">
-                                    <span className="font-mono font-bold text-gray-700">
-                                      Lote: {l.lote}
-                                    </span>
-                                    <span className="text-emerald-700 font-semibold">
-                                      ({l.quantidade})
-                                    </span>
-                                    <span className="text-gray-400">|</span>
-                                    <span className="text-gray-600 font-medium">
-                                      NF: {l.notaFiscal || "N/D"}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                    <span className="text-gray-400">
-                                      Val: {l.validade}
-                                    </span>
-                                    {l.vencido ? (
-                                      <span className="text-red-600 font-bold flex items-center space-x-0.5">
-                                        <AlertTriangle className="h-3 w-3" />
-                                        <span>Vencido</span>
+                        </div>
+                      </div>
+
+                      {abaixoDoMinimo && (
+                        <div className="flex items-center text-[11px] font-bold text-amber-800 bg-amber-100/70 px-2 py-1 rounded">
+                          <AlertTriangle className="h-3 w-3 mr-1 text-amber-600 shrink-0" />
+                          <span>Estoque Crítico (Mínimo: {item.estoqueMinimo})</span>
+                        </div>
+                      )}
+
+                      {/* Lotes Detalhados no Mobile */}
+                      <div className="pt-2 border-t border-gray-200 space-y-1.5">
+                        <span className="text-[11px] font-bold text-gray-500 uppercase">Lotes:</span>
+                        {item.lotesDetalhados.length === 0 ? (
+                          <p className="text-xs text-gray-400 italic">Nenhum lote registrado.</p>
+                        ) : (
+                          item.lotesDetalhados.map((l: any, idx: number) => (
+                            <div key={idx} className="bg-white p-2 rounded border border-gray-200 text-xs space-y-1">
+                              <div className="flex justify-between font-medium">
+                                <span className="font-mono text-gray-800 font-bold">Lote: {l.lote}</span>
+                                <span className="text-emerald-700 font-bold">Qtd: {l.quantidade}</span>
+                              </div>
+                              <div className="flex justify-between text-gray-500 text-[11px]">
+                                <span>NF: {l.notaFiscal}</span>
+                                <span className="flex items-center gap-1">
+                                  Val: {l.validade}
+                                  {l.vencido ? (
+                                    <span className="text-red-600 font-bold">Vencido</span>
+                                  ) : (
+                                    <span className="text-emerald-600">No prazo</span>
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Layout Desktop: Tabela Tradicional */}
+              <div className="hidden md:block overflow-x-auto border rounded-lg">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50 text-xs text-gray-600 uppercase">
+                    <tr>
+                      <th className="px-6 py-3 text-left w-24">Código</th>
+                      <th className="px-6 py-3 text-left">Produto</th>
+                      <th className="px-6 py-3 text-center">Embalagem</th>
+                      <th className="px-6 py-3 text-center">
+                        Qtd. Total em Estoque
+                      </th>
+                      <th className="px-6 py-3 text-center">Estoque Mínimo</th>
+                      <th className="px-6 py-3 text-left">
+                        Detalhamento dos Lotes
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200 text-sm">
+                    {listaConsolidada.map((item: any) => {
+                      const abaixoDoMinimo =
+                        item.quantidadeTotal <= item.estoqueMinimo;
+                      return (
+                        <tr
+                          key={item.idUnico}
+                          className={`hover:bg-gray-50 transition ${
+                            abaixoDoMinimo ? "bg-amber-50/40" : ""
+                          }`}
+                        >
+                          <td className="px-6 py-4 font-mono font-bold text-gray-600 text-center">
+                            {item.idProduto}
+                          </td>
+                          <td className="px-6 py-4 font-bold text-gray-900">
+                            <div className="flex items-center space-x-2">
+                              <span>{item.nomeProduto}</span>
+                              {abaixoDoMinimo && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                  <AlertTriangle className="h-3 w-3 mr-1 text-amber-600" />
+                                  Estoque Crítico
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center text-gray-700 font-medium">
+                            {item.embalagem}
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span
+                              className={`font-bold px-3 py-1 rounded-full text-xs inline-flex items-center space-x-1 ${
+                                abaixoDoMinimo
+                                  ? "bg-amber-100 text-amber-800 border border-amber-300"
+                                  : "bg-emerald-100 text-emerald-800"
+                              }`}
+                            >
+                              <span>{item.quantidadeTotal}</span>
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-gray-700 font-semibold text-xs">
+                              {item.estoqueMinimo}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="space-y-1.5 text-xs">
+                              {item.lotesDetalhados.length === 0 ? (
+                                <span className="text-gray-400 italic">
+                                  Nenhum lote cadastrado ou estoque zerado.
+                                </span>
+                              ) : (
+                                item.lotesDetalhados.map((l: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    className="flex flex-wrap items-center justify-between gap-1 bg-gray-50 px-2.5 py-1.5 rounded border"
+                                  >
+                                    <div className="flex items-center space-x-2">
+                                      <span className="font-mono font-bold text-gray-700">
+                                        Lote: {l.lote}
                                       </span>
-                                    ) : (
-                                      <span className="text-emerald-600 flex items-center space-x-0.5">
-                                        <CheckCircle className="h-3 w-3" />
-                                        <span>No prazo</span>
+                                      <span className="text-emerald-700 font-semibold">
+                                        ({l.quantidade})
                                       </span>
-                                    )}
+                                      <span className="text-gray-400">|</span>
+                                      <span className="text-gray-600 font-medium">
+                                        NF: {l.notaFiscal || "N/D"}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <span className="text-gray-400">
+                                        Val: {l.validade}
+                                      </span>
+                                      {l.vencido ? (
+                                        <span className="text-red-600 font-bold flex items-center space-x-0.5">
+                                          <AlertTriangle className="h-3 w-3" />
+                                          <span>Vencido</span>
+                                        </span>
+                                      ) : (
+                                        <span className="text-emerald-600 flex items-center space-x-0.5">
+                                          <CheckCircle className="h-3 w-3" />
+                                          <span>No prazo</span>
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                                ))
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </div>
