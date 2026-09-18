@@ -70,11 +70,11 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
     return () => window.removeEventListener("storage", verificarRascunho);
   }, [chaveLocalStorage]);
 
- // Carregar dados da API do Backend respeitando a empresa selecionada
+// Carregar dados da API do Backend respeitando a empresa selecionada
   useEffect(() => {
     const buscarEstoque = async () => {
       try {
-        // Pega a URL base configurada no seu arquivo .env (ex: ngrok ou produção)
+        // Pega a URL base configurada no .env (ex: https://overrule-item-barbell.ngrok-free.dev/api)
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
         
         const query = empresaSelecionada ? `?empresaId=${empresaSelecionada}` : '';
@@ -92,7 +92,7 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
         } else {
           console.error("Erro ao carregar o estoque do servidor.");
         }
-      } catch (error) {print
+      } catch (error) {
         console.error("Erro de conexão com o servidor:", error);
       }
     };
