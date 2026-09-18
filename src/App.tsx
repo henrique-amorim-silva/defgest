@@ -7,11 +7,15 @@ import { EmissaoReceita } from "./pages/EmissaoReceita";
 import { ConsultaAgrofit } from "./pages/ConsultaAgrofit";
 import { Login } from "./pages/Login";
 import { GerenciamentoUsuarios } from "./pages/GerenciamentoUsuarios";
-import Cadastros from "./pages/Cadastros"; // <-- 1. Importado aqui
+import Cadastros from "./pages/Cadastros";
 import { LogOut } from "lucide-react";
 
 export function App() {
-  const [currentTab, setCurrentTab] = useState("dashboard");
+  // 1. Inicializa o estado lendo do localStorage (ou define 'dashboard' como padrão)
+  const [currentTab, setCurrentTab] = useState<string>(() => {
+    return localStorage.getItem("defgest_aba_ativa") || "dashboard";
+  });
+  
   const [token, setToken] = useState<string | null>(null);
   const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("");
 
@@ -22,9 +26,16 @@ export function App() {
     }
   }, []);
 
+  // 2. Sempre que a aba mudar, salvamos o valor atualizado no localStorage
+  const handleTrocarTab = (tab: string) => {
+    setCurrentTab(tab);
+    localStorage.setItem("defgest_aba_ativa", tab);
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("usuario");
+    localStorage.removeItem("defgest_aba_ativa"); // Opcional: limpa a aba salva ao sair
     setToken(null);
     setEmpresaSelecionada("");
   };
@@ -40,7 +51,7 @@ export function App() {
       case "dashboard":
         return (
           <Dashboard
-            setCurrentTab={setCurrentTab}
+            setCurrentTab={handleTrocarTab}
             empresaSelecionada={empresaSelecionada}
           />
         );
@@ -52,14 +63,14 @@ export function App() {
         return <EmissaoReceita />;
       case "agrofit":
         return <ConsultaAgrofit />;
-      case "cadastros": // <-- 2. Adicionado na rota/case
+      case "cadastros":
         return <Cadastros empresaId={Number(empresaSelecionada) || 1} />;
       case "admin_usuarios":
         return <GerenciamentoUsuarios />;
       default:
         return (
           <Dashboard
-            setCurrentTab={setCurrentTab}
+            setCurrentTab={handleTrocarTab}
             empresaSelecionada={empresaSelecionada}
           />
         );
@@ -79,7 +90,7 @@ export function App() {
       </div>
       <Navbar
         currentTab={currentTab}
-        setCurrentTab={setCurrentTab}
+        setCurrentTab={handleTrocarTab} // Substituído para usar a função que persiste
         empresaSelecionada={empresaSelecionada}
         setEmpresaSelecionada={setEmpresaSelecionada}
       />
