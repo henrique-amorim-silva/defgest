@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import type { ItemEstoque } from "../@types/estoque";
+import { listarEstoque } from '../services/estoqueApi';
 import {
   Package,
   Search,
@@ -71,34 +72,18 @@ export const Estoque: React.FC<EstoqueProps> = ({ empresaSelecionada, setCurrent
   }, [chaveLocalStorage]);
 
 // Carregar dados da API do Backend respeitando a empresa selecionada
-  useEffect(() => {
-    const buscarEstoque = async () => {
-      try {
-        // Pega a URL base configurada no .env (ex: https://overrule-item-barbell.ngrok-free.dev/api)
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-        
-        const query = empresaSelecionada ? `?empresaId=${empresaSelecionada}` : '';
-        const url = `${baseUrl.replace(/\/$/, '')}/estoque${query}`;
+ useEffect(() => {
+  const buscarEstoque = async () => {
+    try {
+      const dados = await listarEstoque(empresaSelecionada);
+      setEstoque(dados);
+    } catch (error) {
+      console.error("Erro de conexão com o servidor:", error);
+    }
+  };
 
-        const token = localStorage.getItem("token");
-        const response = await fetch(url, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (response.ok) {
-          const dados = await response.json();
-          setEstoque(dados);
-        } else {
-          console.error("Erro ao carregar o estoque do servidor.");
-        }
-      } catch (error) {
-        console.error("Erro de conexão com o servidor:", error);
-      }
-    };
-
-    buscarEstoque();
-  }, [empresaSelecionada]);
+  buscarEstoque();
+}, [empresaSelecionada]);
 
   // Função auxiliar para checar se o lote está vencido
   const isVencido = (dataValidade: string) => {
