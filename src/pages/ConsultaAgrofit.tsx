@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { apiRequest } from "../services/api";
 import {
-  Search,
   Database,
   RefreshCw,
   ChevronLeft,
@@ -42,13 +41,24 @@ export interface ProdutoAgrofitCompleto {
   cultura: string;
   praga: string;
   unidadePadrao: string;
+  updatedAt?: string;
   documentosCadastrados: DocumentoAgrofit[];
   indicacoesUso: IndicacaoUso[];
 }
 
 export const ConsultaAgrofit: React.FC = () => {
   const [produtos, setProdutos] = useState<ProdutoAgrofitCompleto[]>([]);
-  const [termo, setTermo] = useState("");
+  
+  // Substituição do termo único pelo objeto de filtros estruturado
+  const [filtros, setFiltros] = useState({
+    registro: "",
+    nomeComercial: "",
+    ingredienteAtivo: "",
+    classeToxicologica: "",
+    cultura: "",
+    praga: "",
+  });
+
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -80,7 +90,12 @@ export const ConsultaAgrofit: React.FC = () => {
     formulacao: "",
     grupo_quimico: "",
     classe_toxicologica: "",
+    classe_categoria_agronomica: "",
+    tecnica_aplicacao: "",
+    classificacao_ambiental: "",
     unidade_medida: "",
+    inflamavel: false,
+    corrosivo: false,
     url: "",
   });
 
@@ -88,12 +103,24 @@ export const ConsultaAgrofit: React.FC = () => {
   const [itensPorPagina, setItensPorPagina] = useState<number | "todos">(10);
   const [totalRegistros, setTotalRegistros] = useState(0);
 
-  const carregarCatalogo = async (termoBusca = "", signal?: AbortSignal) => {
+  const carregarCatalogo = async (filtrosAtuais = filtros, signal?: AbortSignal) => {
     setCarregando(true);
     setErro(null);
     try {
       const limiteParam = itensPorPagina === "todos" ? 10000 : itensPorPagina;
-      const endpoint = `agrofit/produtos?page=${paginaAtual}&limit=${limiteParam}&busca=${encodeURIComponent(termoBusca)}`;
+      
+      const params = new URLSearchParams({
+        page: String(paginaAtual),
+        limit: String(limiteParam),
+        registro: filtrosAtuais.registro,
+        nomeComercial: filtrosAtuais.nomeComercial,
+        ingredienteAtivo: filtrosAtuais.ingredienteAtivo,
+        classeToxicologica: filtrosAtuais.classeToxicologica,
+        cultura: filtrosAtuais.cultura,
+        praga: filtrosAtuais.praga,
+      });
+
+      const endpoint = `agrofit/produtos?${params.toString()}`;
       const dados = await apiRequest(endpoint, { signal });
       setProdutos(dados.produtos || []);
       setTotalRegistros(dados.total || 0);
@@ -115,14 +142,14 @@ export const ConsultaAgrofit: React.FC = () => {
   useEffect(() => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      carregarCatalogo(termo, controller.signal);
+      carregarCatalogo(filtros, controller.signal);
     }, 300);
 
     return () => {
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [termo, paginaAtual, itensPorPagina]);
+  }, [filtros, paginaAtual, itensPorPagina]);
 
   const abrirModalCadastro = () => {
     setProdutoEmEdicao(null);
@@ -134,7 +161,12 @@ export const ConsultaAgrofit: React.FC = () => {
       formulacao: "",
       grupo_quimico: "",
       classe_toxicologica: "",
+      classe_categoria_agronomica: "",
+      tecnica_aplicacao: "",
+      classificacao_ambiental: "",
       unidade_medida: "",
+      inflamavel: false,
+      corrosivo: false,
       url: "",
     });
     setModalFormAberto(true);
@@ -150,7 +182,16 @@ export const ConsultaAgrofit: React.FC = () => {
       formulacao: prod.formulacao || "",
       grupo_quimico: prod.grupoQuimico || "",
       classe_toxicologica: prod.classeToxicologica || "",
+      classe_categoria_agronomica:
+        (prod as any).classeCategoriaAgronomica || "",
+      tecnica_aplicacao: (prod as any).tecnicaAplicacao || "",
+      classificacao_ambiental: (prod as any).classificacaoAmbiental || "",
       unidade_medida: prod.unidadePadrao || "",
+      inflamavel:
+        (prod as any).inflamavel === true ||
+        (prod as any).inflamavel === "true",
+      corrosivo:
+        (prod as any).corrosivo === true || (prod as any).corrosivo === "true",
       url: prod.documentosCadastrados?.[0]?.url || "",
     });
     setModalFormAberto(true);
@@ -160,13 +201,11 @@ export const ConsultaAgrofit: React.FC = () => {
     e.preventDefault();
     try {
       if (produtoEmEdicao) {
-        // Atualização via PUT
         await apiRequest(`agrofit/produtos/${produtoEmEdicao.registro}`, {
           method: "PUT",
           body: JSON.stringify(formData),
         });
 
-        // Atualiza a lista localmente sem precisar buscar tudo do banco de novo
         setProdutos((prev) =>
           prev.map((p) =>
             p.registro === produtoEmEdicao.registro
@@ -178,21 +217,23 @@ export const ConsultaAgrofit: React.FC = () => {
                   formulacao: formData.formulacao,
                   grupoQuimico: formData.grupo_quimico,
                   classeToxicologica: formData.classe_toxicologica,
+                  classificacaoAmbiental: formData.classificacao_ambiental,
+                  classeCategoriaAgronomica:
+                    formData.classe_categoria_agronomica,
                   unidadePadrao: formData.unidade_medida,
                   documentosCadastrados: formData.url
                     ? [{ tipo_documento: "Bula", url: formData.url }]
                     : [],
                 }
-              : p
-          )
+              : p,
+          ),
         );
       } else {
-        // Cadastro novo (mantém a recarga para o novo item aparecer na paginação corretamente)
         await apiRequest("agrofit/produtos", {
           method: "POST",
           body: JSON.stringify(formData),
         });
-        carregarCatalogo(termo);
+        carregarCatalogo(filtros);
       }
       setModalFormAberto(false);
     } catch (err: any) {
@@ -204,7 +245,7 @@ export const ConsultaAgrofit: React.FC = () => {
     if (!confirm(`Deseja realmente excluir o registro ${registro}?`)) return;
     try {
       await apiRequest(`agrofit/produtos/${registro}`, { method: "DELETE" });
-      carregarCatalogo(termo);
+      carregarCatalogo(filtros);
     } catch (err: any) {
       alert("Erro ao excluir: " + err.message);
     }
@@ -223,15 +264,15 @@ export const ConsultaAgrofit: React.FC = () => {
     setModalInstrucaoAberto(true);
   };
 
- const abrirEditarInstrucao = (item: any) => {
+  const abrirEditarInstrucao = (item: any) => {
     setInstrucaoEmEdicao(item);
     setFormInstrucao({
       cultura: item.cultura || "",
       praga_nome_comum: item.pragaNomeComum || "",
       praga_nome_cientifico: item.pragaNomeCientifico || "",
-      dose: item.dose || "",                 // Corrigido de doseMin para dose
-      max_aplicacoes: item.maxAplicacoes || "", // Corrigido de numeroAplicacoesMax para maxAplicacoes
-      volume_calda: item.volumeCalda || "",   // Corrigido de vCaldaMin para volumeCalda
+      dose: item.dose || "",
+      max_aplicacoes: item.maxAplicacoes || "",
+      volume_calda: item.volumeCalda || "",
     });
     setModalInstrucaoAberto(true);
   };
@@ -241,13 +282,11 @@ export const ConsultaAgrofit: React.FC = () => {
     if (!produtoModal) return;
     try {
       if (instrucaoEmEdicao && instrucaoEmEdicao.id) {
-        // Edição de instrução existente
         await apiRequest(`agrofit/instrucoes/${instrucaoEmEdicao.id}`, {
           method: "PUT",
           body: JSON.stringify(formInstrucao),
         });
 
-        // Atualiza localmente dentro do modal aberto
         const novasIndicacoes = produtoModal.indicacoesUso.map((ind) =>
           ind.id === instrucaoEmEdicao.id
             ? {
@@ -259,20 +298,19 @@ export const ConsultaAgrofit: React.FC = () => {
                 maxAplicacoes: formInstrucao.max_aplicacoes,
                 volumeCalda: formInstrucao.volume_calda,
               }
-            : ind
+            : ind,
         );
 
         setProdutoModal({ ...produtoModal, indicacoesUso: novasIndicacoes });
       } else {
-        // Criação de nova instrução (como gera um ID novo no banco, aqui vale a pena recarregar ou adicionar manualmente se preferir)
         await apiRequest(
           `agrofit/produtos/${produtoModal.registro}/instrucoes`,
           {
             method: "POST",
             body: JSON.stringify(formInstrucao),
-          }
+          },
         );
-        carregarCatalogo(termo); // Ou recarrega apenas se for inclusão nova
+        carregarCatalogo(filtros);
       }
       setModalInstrucaoAberto(false);
     } catch (err: any) {
@@ -284,7 +322,7 @@ export const ConsultaAgrofit: React.FC = () => {
     if (!confirm("Deseja realmente excluir esta instrução de uso?")) return;
     try {
       await apiRequest(`agrofit/instrucoes/${id}`, { method: "DELETE" });
-      carregarCatalogo(termo);
+      carregarCatalogo(filtros);
     } catch (err: any) {
       alert("Erro ao excluir instrução: " + err.message);
     }
@@ -304,6 +342,8 @@ export const ConsultaAgrofit: React.FC = () => {
   return (
     <div className="max-w-[95%] mx-auto py-8 px-4">
       <div className="bg-white rounded-xl shadow-md overflow-hidden p-6 border border-emerald-100">
+        
+        {/* Cabeçalho */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 border-b pb-4 gap-4">
           <div className="flex items-center space-x-3">
             <Database className="h-7 w-7 text-emerald-600" />
@@ -317,7 +357,7 @@ export const ConsultaAgrofit: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center space-x-3 gap-y-2 w-full md:w-auto">
+          <div className="flex items-center space-x-3">
             {isAdminMaster && (
               <button
                 onClick={abrirModalCadastro}
@@ -326,26 +366,100 @@ export const ConsultaAgrofit: React.FC = () => {
                 <Plus className="h-4 w-4" /> Novo Agrotóxico
               </button>
             )}
-            <div className="relative flex-1 md:w-80">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Pesquisar por registro, nome ou ativo..."
-                value={termo}
-                onChange={(e) => {
-                  setTermo(e.target.value);
-                  setPaginaAtual(1);
-                }}
-                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
             <button
-              onClick={() => carregarCatalogo(termo)}
+              onClick={() => carregarCatalogo(filtros)}
               title="Atualizar dados"
               className="bg-gray-100 hover:bg-gray-200 text-gray-700 p-2 rounded-md transition"
             >
               <RefreshCw className="h-5 w-5" />
             </button>
+          </div>
+        </div>
+
+        {/* Bloco com os 6 Inputs de Filtros Deduzidos */}
+        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Registro</label>
+            <input
+              type="text"
+              placeholder="Filtrar registro..."
+              value={filtros.registro}
+              onChange={(e) => {
+                setFiltros({ ...filtros, registro: e.target.value });
+                setPaginaAtual(1);
+              }}
+              className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Nome Comercial</label>
+            <input
+              type="text"
+              placeholder="Filtrar nome..."
+              value={filtros.nomeComercial}
+              onChange={(e) => {
+                setFiltros({ ...filtros, nomeComercial: e.target.value });
+                setPaginaAtual(1);
+              }}
+              className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Ingrediente Ativo</label>
+            <input
+              type="text"
+              placeholder="Filtrar ativo..."
+              value={filtros.ingredienteAtivo}
+              onChange={(e) => {
+                setFiltros({ ...filtros, ingredienteAtivo: e.target.value });
+                setPaginaAtual(1);
+              }}
+              className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Classe Toxicológica</label>
+            <input
+              type="text"
+              placeholder="Filtrar classe..."
+              value={filtros.classeToxicologica}
+              onChange={(e) => {
+                setFiltros({ ...filtros, classeToxicologica: e.target.value });
+                setPaginaAtual(1);
+              }}
+              className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Cultura</label>
+            <input
+              type="text"
+              placeholder="Filtrar cultura..."
+              value={filtros.cultura}
+              onChange={(e) => {
+                setFiltros({ ...filtros, cultura: e.target.value });
+                setPaginaAtual(1);
+              }}
+              className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Praga</label>
+            <input
+              type="text"
+              placeholder="Filtrar praga..."
+              value={filtros.praga}
+              onChange={(e) => {
+                setFiltros({ ...filtros, praga: e.target.value });
+                setPaginaAtual(1);
+              }}
+              className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+            />
           </div>
         </div>
 
@@ -393,6 +507,9 @@ export const ConsultaAgrofit: React.FC = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
                       Unidade
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                      Ult. Modificação
+                    </th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">
                       Bula
                     </th>
@@ -412,21 +529,33 @@ export const ConsultaAgrofit: React.FC = () => {
                     return (
                       <tr
                         key={p.registro}
-                        className="hover:bg-emerald-50/50 transition"
+                        className="hover:bg-emerald-50/50 transition text"
                       >
-                        <td className="px-3 py-3 whitespace-nowrap text-xs font-mono font-medium text-emerald-800">
+                        <td className="px-6 py-3 whitespace-nowrap text-xs font-mono font-medium text-emerald-800">
                           {p.registro}
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-xs font-bold text-gray-900 max-w-40 truncate" title={p.nomeComercial}>
+                        <td
+                          className="px-3 py-3 whitespace-nowrap text-xs font-bold text-gray-900 max-w-40 truncate"
+                          title={p.nomeComercial}
+                        >
                           {p.nomeComercial}
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-600 max-w-35 truncate" title={p.titularRegistro}>
+                        <td
+                          className="px-3 py-3 whitespace-nowrap text-xs text-gray-600 max-w-35 truncate"
+                          title={p.titularRegistro}
+                        >
                           {p.titularRegistro}
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-800 font-medium max-w-45 truncate" title={p.ingredienteAtivo}>
+                        <td
+                          className="px-3 py-3 whitespace-nowrap text-xs text-gray-800 font-medium max-w-45 truncate"
+                          title={p.ingredienteAtivo}
+                        >
                           {p.ingredienteAtivo}
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-600 max-w-35 truncate" title={`${p.formulacao} - ${p.grupoQuimico}`}>
+                        <td
+                          className="px-3 py-3 whitespace-nowrap text-xs text-gray-600 max-w-35 truncate"
+                          title={`${p.formulacao} - ${p.grupoQuimico}`}
+                        >
                           <div className="font-semibold text-gray-800 truncate">
                             {p.formulacao}
                           </div>
@@ -435,7 +564,10 @@ export const ConsultaAgrofit: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap text-xs">
-                          <span className="px-2 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-900 rounded-full border border-amber-200 inline-block truncate max-w-30" title={p.classeToxicologica}>
+                          <span
+                            className="px-2 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-900 rounded-full border border-amber-200 inline-block truncate max-w-30"
+                            title={p.classeToxicologica}
+                          >
                             {p.classeToxicologica}
                           </span>
                         </td>
@@ -445,12 +577,24 @@ export const ConsultaAgrofit: React.FC = () => {
                               onClick={() => setProdutoModal(p)}
                               className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-800 transition"
                             >
-                              <Eye className="h-3 w-3" /> Ver correlações ({p.indicacoesUso.length})
+                              <Eye className="h-3 w-3" /> Ver correlações (
+                              {p.indicacoesUso.length})
                             </button>
                           )}
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap text-xs font-bold text-gray-700">
                           {p.unidadePadrao}
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-600">
+                          {p.updatedAt
+                            ? new Date(p.updatedAt).toLocaleString("pt-BR", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "-"}
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap text-center text-xs">
                           {docBula && docBula.url ? (
@@ -804,14 +948,17 @@ export const ConsultaAgrofit: React.FC = () => {
       )}
 
       {modalFormAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl max-w-xl w-full p-6 my-8 max-h-[90vh] flex flex-col">
             <h3 className="text-lg font-bold text-gray-800 mb-4">
               {produtoEmEdicao
                 ? "Editar Agrotóxico"
                 : "Cadastrar Novo Agrotóxico"}
             </h3>
-            <form onSubmit={handleSubmitForm} className="space-y-3">
+            <form
+              onSubmit={handleSubmitForm}
+              className="space-y-3 overflow-y-auto pr-2 flex-1"
+            >
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Número de Registro
@@ -879,75 +1026,162 @@ export const ConsultaAgrofit: React.FC = () => {
                   className="w-full px-3 py-2 border rounded text-sm"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Formulação
-                </label>
-                <input
-                  type="text"
-                  value={formData.formulacao}
-                  onChange={(e) =>
-                    setFormData({ ...formData, formulacao: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border rounded text-sm"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Formulação
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.formulacao}
+                    onChange={(e) =>
+                      setFormData({ ...formData, formulacao: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Grupo Químico
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.grupo_quimico}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        grupo_quimico: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Grupo Químico
-                </label>
-                <input
-                  type="text"
-                  value={formData.grupo_quimico}
-                  onChange={(e) =>
-                    setFormData({ ...formData, grupo_quimico: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border rounded text-sm"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Classe Toxicológica
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.classe_toxicologica}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        classe_toxicologica: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Classe / Categoria Agronômica
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.classe_categoria_agronomica}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        classe_categoria_agronomica: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Classe Toxicológica
-                </label>
-                <input
-                  type="text"
-                  value={formData.classe_toxicologica}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      classe_toxicologica: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border rounded text-sm"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Técnica de Aplicação
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.tecnica_aplicacao}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        tecnica_aplicacao: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Classificação Ambiental
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.classificacao_ambiental}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        classificacao_ambiental: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Unidade de Medida
-                </label>
-                <input
-                  type="text"
-                  value={formData.unidade_medida}
-                  onChange={(e) =>
-                    setFormData({ ...formData, unidade_medida: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border rounded text-sm"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Unidade de Medida
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.unidade_medida}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        unidade_medida: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    URL da Bula
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.url}
+                    onChange={(e) =>
+                      setFormData({ ...formData, url: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  URL da Bula
+              <div className="flex items-center space-x-6 pt-2">
+                <label className="flex items-center space-x-2 text-xs font-semibold text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.inflamavel}
+                    onChange={(e) =>
+                      setFormData({ ...formData, inflamavel: e.target.checked })
+                    }
+                    className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                  />
+                  <span>Inflamável</span>
                 </label>
-                <input
-                  type="text"
-                  value={formData.url}
-                  onChange={(e) =>
-                    setFormData({ ...formData, url: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border rounded text-sm"
-                />
+                <label className="flex items-center space-x-2 text-xs font-semibold text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.corrosivo}
+                    onChange={(e) =>
+                      setFormData({ ...formData, corrosivo: e.target.checked })
+                    }
+                    className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                  />
+                  <span>Corrosivo</span>
+                </label>
               </div>
-              <div className="flex justify-end space-x-2 pt-4">
+
+              <div className="flex justify-end space-x-2 pt-4 border-t mt-4">
                 <button
                   type="button"
                   onClick={() => setModalFormAberto(false)}

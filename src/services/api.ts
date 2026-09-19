@@ -52,10 +52,9 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
     if (contentType && contentType.includes('application/json')) {
       return await response.json();
     }
-
+    
     return null;
-  } catch (erro) {
-    console.error(`[API Error] Falha ao acessar ${url}:`, erro);
-    throw erro;
+  } catch (error) {
+    throw error;
   }
 }
