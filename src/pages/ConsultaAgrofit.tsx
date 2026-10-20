@@ -59,6 +59,7 @@ export const ConsultaAgrofit: React.FC = () => {
   const [filtros, setFiltros] = useState({
     registro: "",
     nomeComercial: "",
+    titularRegistro: "",
     ingredienteAtivo: "",
     classeToxicologica: "",
     cultura: "",
@@ -80,7 +81,6 @@ export const ConsultaAgrofit: React.FC = () => {
   const [modalInstrucaoAberto, setModalInstrucaoAberto] = useState(false);
   const [instrucaoEmEdicao, setInstrucaoEmEdicao] = useState<any | null>(null);
   
-  // Estado atualizado com todos os novos campos da instrução de uso
   const [formInstrucao, setFormInstrucao] = useState({
     cultura: "",
     praga_nome_comum: "",
@@ -130,6 +130,7 @@ export const ConsultaAgrofit: React.FC = () => {
         limit: String(limiteParam),
         registro: filtrosAtuais.registro,
         nomeComercial: filtrosAtuais.nomeComercial,
+        titularRegistro: filtrosAtuais.titularRegistro,
         ingredienteAtivo: filtrosAtuais.ingredienteAtivo,
         classeToxicologica: filtrosAtuais.classeToxicologica,
         cultura: filtrosAtuais.cultura,
@@ -392,8 +393,8 @@ export const ConsultaAgrofit: React.FC = () => {
           </div>
         </div>
 
-        {/* Filtros */}
-        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {/* Filtros (Com o campo Titular entre Nome Comercial e Ingrediente Ativo - 7 colunas) */}
+        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Registro</label>
             <input
@@ -416,6 +417,20 @@ export const ConsultaAgrofit: React.FC = () => {
               value={filtros.nomeComercial}
               onChange={(e) => {
                 setFiltros({ ...filtros, nomeComercial: e.target.value });
+                setPaginaAtual(1);
+              }}
+              className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Titular</label>
+            <input
+              type="text"
+              placeholder="Filtrar titular..."
+              value={filtros.titularRegistro}
+              onChange={(e) => {
+                setFiltros({ ...filtros, titularRegistro: e.target.value });
                 setPaginaAtual(1);
               }}
               className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
