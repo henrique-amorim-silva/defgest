@@ -18,10 +18,17 @@ export interface IndicacaoUso {
   cultura: string;
   pragaNomeComum: string;
   pragaNomeCientifico: string;
-  dose: string;
-  numeroAplicacoesMax: string;
-  maxAplicacoes: string;
-  volumeCalda: string;
+  doseMin?: string;
+  doseMax?: string;
+  doseUnidade?: string;
+  formaAplicacao?: string;
+  volumeCaldaMin?: string;
+  volumeCaldaMax?: string;
+  volumeCaldaUnidade?: string;
+  nAplicacoes?: string;
+  intReentrada?: string;
+  intSeguranca?: string;
+  observacao?: string;
 }
 
 export interface DocumentoAgrofit {
@@ -49,7 +56,6 @@ export interface ProdutoAgrofitCompleto {
 export const ConsultaAgrofit: React.FC = () => {
   const [produtos, setProdutos] = useState<ProdutoAgrofitCompleto[]>([]);
   
-  // Substituição do termo único pelo objeto de filtros estruturado
   const [filtros, setFiltros] = useState({
     registro: "",
     nomeComercial: "",
@@ -73,13 +79,23 @@ export const ConsultaAgrofit: React.FC = () => {
 
   const [modalInstrucaoAberto, setModalInstrucaoAberto] = useState(false);
   const [instrucaoEmEdicao, setInstrucaoEmEdicao] = useState<any | null>(null);
+  
+  // Estado atualizado com todos os novos campos da instrução de uso
   const [formInstrucao, setFormInstrucao] = useState({
     cultura: "",
     praga_nome_comum: "",
     praga_nome_cientifico: "",
-    dose: "",
-    max_aplicacoes: "",
-    volume_calda: "",
+    dose_min: "",
+    dose_max: "",
+    dose_unidade: "",
+    forma_aplicacao: "",
+    volume_calda_min: "",
+    volume_calda_max: "",
+    volume_calda_unidade: "",
+    n_aplicacoes: "",
+    int_reentrada: "",
+    int_seguranca: "",
+    observacao: "",
   });
 
   const [formData, setFormData] = useState({
@@ -257,9 +273,17 @@ export const ConsultaAgrofit: React.FC = () => {
       cultura: "",
       praga_nome_comum: "",
       praga_nome_cientifico: "",
-      dose: "",
-      max_aplicacoes: "",
-      volume_calda: "",
+      dose_min: "",
+      dose_max: "",
+      dose_unidade: "",
+      forma_aplicacao: "",
+      volume_calda_min: "",
+      volume_calda_max: "",
+      volume_calda_unidade: "",
+      n_aplicacoes: "",
+      int_reentrada: "",
+      int_seguranca: "",
+      observacao: "",
     });
     setModalInstrucaoAberto(true);
   };
@@ -270,9 +294,17 @@ export const ConsultaAgrofit: React.FC = () => {
       cultura: item.cultura || "",
       praga_nome_comum: item.pragaNomeComum || "",
       praga_nome_cientifico: item.pragaNomeCientifico || "",
-      dose: item.dose || "",
-      max_aplicacoes: item.maxAplicacoes || "",
-      volume_calda: item.volumeCalda || "",
+      dose_min: item.doseMin || "",
+      dose_max: item.doseMax || "",
+      dose_unidade: item.doseUnidade || "",
+      forma_aplicacao: item.formaAplicacao || "",
+      volume_calda_min: item.volumeCaldaMin || "",
+      volume_calda_max: item.volumeCaldaMax || "",
+      volume_calda_unidade: item.volumeCaldaUnidade || "",
+      n_aplicacoes: item.nAplicacoes || "",
+      int_reentrada: item.intReentrada || "",
+      int_seguranca: item.intSeguranca || "",
+      observacao: item.observacao || "",
     });
     setModalInstrucaoAberto(true);
   };
@@ -286,22 +318,6 @@ export const ConsultaAgrofit: React.FC = () => {
           method: "PUT",
           body: JSON.stringify(formInstrucao),
         });
-
-        const novasIndicacoes = produtoModal.indicacoesUso.map((ind) =>
-          ind.id === instrucaoEmEdicao.id
-            ? {
-                ...ind,
-                cultura: formInstrucao.cultura,
-                pragaNomeComum: formInstrucao.praga_nome_comum,
-                pragaNomeCientifico: formInstrucao.praga_nome_cientifico,
-                dose: formInstrucao.dose,
-                maxAplicacoes: formInstrucao.max_aplicacoes,
-                volumeCalda: formInstrucao.volume_calda,
-              }
-            : ind,
-        );
-
-        setProdutoModal({ ...produtoModal, indicacoesUso: novasIndicacoes });
       } else {
         await apiRequest(
           `agrofit/produtos/${produtoModal.registro}/instrucoes`,
@@ -310,9 +326,9 @@ export const ConsultaAgrofit: React.FC = () => {
             body: JSON.stringify(formInstrucao),
           },
         );
-        carregarCatalogo(filtros);
       }
       setModalInstrucaoAberto(false);
+      carregarCatalogo(filtros);
     } catch (err: any) {
       alert("Erro ao salvar instrução: " + err.message);
     }
@@ -341,7 +357,7 @@ export const ConsultaAgrofit: React.FC = () => {
 
   return (
     <div className="max-w-[95%] mx-auto py-8 px-4">
-      <div className="bg-white rounded-xl shadow-md overflow-hidden p-6 border border-emerald-100">
+      <div className="bg-white rounded-xl shadow-xl overflow-hidden p-6 border border-emerald-100">
         
         {/* Cabeçalho */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 border-b pb-4 gap-4">
@@ -376,7 +392,7 @@ export const ConsultaAgrofit: React.FC = () => {
           </div>
         </div>
 
-        {/* Bloco com os 6 Inputs de Filtros Deduzidos */}
+        {/* Filtros */}
         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Registro</label>
@@ -483,40 +499,18 @@ export const ConsultaAgrofit: React.FC = () => {
               <table className="min-w-full divide-y divide-gray-200 bg-white">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                      Registro
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                      Nome Comercial
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                      Titular
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                      Ingrediente Ativo
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                      Formulação / Grupo
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                      Classe Toxicológica
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                      Cultura / Praga
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                      Unidade
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                      Ult. Modificação
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">
-                      Bula
-                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Registro</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Nome Comercial</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Titular</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Ingrediente Ativo</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Formulação / Grupo</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Classe Toxicológica</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Cultura / Praga</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Unidade</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Ult. Modificação</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Bula</th>
                     {isAdminMaster && (
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">
-                        Ações
-                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Ações</th>
                     )}
                   </tr>
                 </thead>
@@ -527,47 +521,25 @@ export const ConsultaAgrofit: React.FC = () => {
                     );
 
                     return (
-                      <tr
-                        key={p.registro}
-                        className="hover:bg-emerald-50/50 transition text"
-                      >
+                      <tr key={p.registro} className="hover:bg-emerald-50/50 transition text">
                         <td className="px-6 py-3 whitespace-nowrap text-xs font-mono font-medium text-emerald-800">
                           {p.registro}
                         </td>
-                        <td
-                          className="px-3 py-3 whitespace-nowrap text-xs font-bold text-gray-900 max-w-40 truncate"
-                          title={p.nomeComercial}
-                        >
+                        <td className="px-3 py-3 whitespace-nowrap text-xs font-bold text-gray-900 max-w-40 truncate" title={p.nomeComercial}>
                           {p.nomeComercial}
                         </td>
-                        <td
-                          className="px-3 py-3 whitespace-nowrap text-xs text-gray-600 max-w-35 truncate"
-                          title={p.titularRegistro}
-                        >
+                        <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-600 max-w-35 truncate" title={p.titularRegistro}>
                           {p.titularRegistro}
                         </td>
-                        <td
-                          className="px-3 py-3 whitespace-nowrap text-xs text-gray-800 font-medium max-w-45 truncate"
-                          title={p.ingredienteAtivo}
-                        >
+                        <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-800 font-medium max-w-45 truncate" title={p.ingredienteAtivo}>
                           {p.ingredienteAtivo}
                         </td>
-                        <td
-                          className="px-3 py-3 whitespace-nowrap text-xs text-gray-600 max-w-35 truncate"
-                          title={`${p.formulacao} - ${p.grupoQuimico}`}
-                        >
-                          <div className="font-semibold text-gray-800 truncate">
-                            {p.formulacao}
-                          </div>
-                          <div className="text-[11px] text-gray-500 truncate">
-                            {p.grupoQuimico}
-                          </div>
+                        <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-600 max-w-35 truncate" title={`${p.formulacao} - ${p.grupoQuimico}`}>
+                          <div className="font-semibold text-gray-800 truncate">{p.formulacao}</div>
+                          <div className="text-[11px] text-gray-500 truncate">{p.grupoQuimico}</div>
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap text-xs">
-                          <span
-                            className="px-2 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-900 rounded-full border border-amber-200 inline-block truncate max-w-30"
-                            title={p.classeToxicologica}
-                          >
+                          <span className="px-2 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-900 rounded-full border border-amber-200 inline-block truncate max-w-30" title={p.classeToxicologica}>
                             {p.classeToxicologica}
                           </span>
                         </td>
@@ -577,8 +549,7 @@ export const ConsultaAgrofit: React.FC = () => {
                               onClick={() => setProdutoModal(p)}
                               className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-800 transition"
                             >
-                              <Eye className="h-3 w-3" /> Ver correlações (
-                              {p.indicacoesUso.length})
+                              <Eye className="h-3 w-3" /> Ver correlações ({p.indicacoesUso.length})
                             </button>
                           )}
                         </td>
@@ -608,9 +579,7 @@ export const ConsultaAgrofit: React.FC = () => {
                               <FileText className="h-3.5 w-3.5" /> Bula
                             </a>
                           ) : (
-                            <span className="text-[11px] text-gray-400 italic">
-                              -
-                            </span>
+                            <span className="text-[11px] text-gray-400 italic">-</span>
                           )}
                         </td>
                         {isAdminMaster && (
@@ -645,9 +614,7 @@ export const ConsultaAgrofit: React.FC = () => {
                   value={itensPorPagina}
                   onChange={(e) => {
                     const valor = e.target.value;
-                    setItensPorPagina(
-                      valor === "todos" ? "todos" : Number(valor),
-                    );
+                    setItensPorPagina(valor === "todos" ? "todos" : Number(valor));
                     setPaginaAtual(1);
                   }}
                   className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
@@ -662,16 +629,13 @@ export const ConsultaAgrofit: React.FC = () => {
 
               <div>
                 Mostrando {totalRegistros === 0 ? 0 : indiceInicial + 1} a{" "}
-                {Math.min(indiceFinal, totalRegistros)} de {totalRegistros}{" "}
-                registros filtrados
+                {Math.min(indiceFinal, totalRegistros)} de {totalRegistros} registros filtrados
               </div>
 
               {itensPorPagina !== "todos" && totalPaginas > 1 && (
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={() =>
-                      setPaginaAtual((prev) => Math.max(prev - 1, 1))
-                    }
+                    onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
                     disabled={paginaAtual === 1}
                     className="p-2 border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
                   >
@@ -681,9 +645,7 @@ export const ConsultaAgrofit: React.FC = () => {
                     Página {paginaAtual} de {totalPaginas}
                   </span>
                   <button
-                    onClick={() =>
-                      setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))
-                    }
+                    onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))}
                     disabled={paginaAtual === totalPaginas}
                     className="p-2 border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
                   >
@@ -696,17 +658,17 @@ export const ConsultaAgrofit: React.FC = () => {
         )}
       </div>
 
+      {/* Modal de Correlações / Instruções de Uso Detalhadas */}
       {produtoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-6xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+          <div className="bg-white rounded-xl shadow-2xl max-w-7xl w-full max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
               <div>
                 <h3 className="text-lg font-bold text-gray-800">
                   {produtoModal.nomeComercial}
                 </h3>
                 <p className="text-xs text-gray-500 font-mono">
-                  Registro MAPA: {produtoModal.registro} | Ingrediente Ativo:{" "}
-                  {produtoModal.ingredienteAtivo}
+                  Registro MAPA: {produtoModal.registro} | Ingrediente Ativo: {produtoModal.ingredienteAtivo}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -729,32 +691,23 @@ export const ConsultaAgrofit: React.FC = () => {
 
             <div className="p-6 overflow-y-auto flex-1">
               <p className="text-sm font-semibold text-gray-700 mb-3">
-                Especificações de Uso, Doses, Aplicações e Volume de Calda por
-                Cultura:
+                Especificações Completas de Uso, Doses, Aplicação, Calda, Segurança e Observações por Cultura:
               </p>
-              <div className="border border-gray-200 rounded-lg overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50">
+              <div className="border border-gray-200 rounded-lg overflow-x-auto shadow-inner">
+                <table className="min-w-full divide-y divide-gray-200 text-xs">
+                  <thead className="bg-gray-100">
                     <tr>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs">
-                        Cultura
-                      </th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs">
-                        Praga / Alvo
-                      </th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs">
-                        Dose
-                      </th>
-                      <th className="px-4 py-3 text-center font-semibold text-gray-600 text-xs">
-                        Máx. Aplicações
-                      </th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs">
-                        Volume de Calda
-                      </th>
+                      <th className="px-3 py-2.5 text-left font-semibold text-gray-700">Cultura</th>
+                      <th className="px-3 py-2.5 text-left font-semibold text-gray-700">Praga / Alvo</th>
+                      <th className="px-3 py-2.5 text-left font-semibold text-gray-700">Dose (Mín - Máx)</th>
+                      <th className="px-3 py-2.5 text-left font-semibold text-gray-700">Forma Aplicação</th>
+                      <th className="px-3 py-2.5 text-left font-semibold text-gray-700">Volume Calda</th>
+                      <th className="px-3 py-2.5 text-center font-semibold text-gray-700">Nº Aplic.</th>
+                      <th className="px-3 py-2.5 text-center font-semibold text-gray-700">Reentrada</th>
+                      <th className="px-3 py-2.5 text-center font-semibold text-gray-700">Segurança</th>
+                      <th className="px-3 py-2.5 text-left font-semibold text-gray-700">Observação</th>
                       {isAdminMaster && (
-                        <th className="px-4 py-3 text-center font-semibold text-gray-600 text-xs">
-                          Ações
-                        </th>
+                        <th className="px-3 py-2.5 text-center font-semibold text-gray-700">Ações</th>
                       )}
                     </tr>
                   </thead>
@@ -762,28 +715,36 @@ export const ConsultaAgrofit: React.FC = () => {
                     {produtoModal.indicacoesUso &&
                       produtoModal.indicacoesUso.map((item, idx) => (
                         <tr key={item.id || idx} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 font-medium text-gray-900">
+                          <td className="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">
                             {item.cultura}
                           </td>
-                          <td className="px-4 py-3 text-gray-600">
-                            <div className="font-medium text-gray-800">
-                              {item.pragaNomeComum}
-                            </div>
-                            <div className="text-xs italic text-gray-500">
-                              {item.pragaNomeCientifico}
-                            </div>
+                          <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                            <div className="font-medium text-gray-800">{item.pragaNomeComum}</div>
+                            <div className="text-[11px] italic text-gray-500">{item.pragaNomeCientifico}</div>
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-gray-700 font-medium">
-                            {item.dose || "-"}
+                          <td className="px-3 py-2 whitespace-nowrap text-gray-700 font-medium">
+                            {item.doseMin || "-"} {item.doseMax && item.doseMax !== item.doseMin ? `a ${item.doseMax}` : ""} {item.doseUnidade || ""}
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-center text-gray-800 font-semibold">
-                            {item.maxAplicacoes || "-"}
+                          <td className="px-3 py-2 whitespace-nowrap text-gray-700">
+                            {item.formaAplicacao || "-"}
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-gray-700">
-                            {item.volumeCalda || "-"}
+                          <td className="px-3 py-2 whitespace-nowrap text-gray-700">
+                            {item.volumeCaldaMin || "-"} {item.volumeCaldaMax && item.volumeCaldaMax !== item.volumeCaldaMin ? `a ${item.volumeCaldaMax}` : ""} {item.volumeCaldaUnidade || ""}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-center text-gray-800 font-semibold">
+                            {item.nAplicacoes || "-"}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-center text-gray-700">
+                            {item.intReentrada || "-"}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-center text-gray-700">
+                            {item.intSeguranca || "-"}
+                          </td>
+                          <td className="px-3 py-2 text-gray-600 max-w-xs truncate" title={item.observacao}>
+                            {item.observacao || "-"}
                           </td>
                           {isAdminMaster && (
-                            <td className="px-4 py-3 whitespace-nowrap text-center space-x-1">
+                            <td className="px-3 py-2 whitespace-nowrap text-center space-x-1">
                               <button
                                 onClick={() => abrirEditarInstrucao(item)}
                                 className="p-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded"
@@ -792,9 +753,7 @@ export const ConsultaAgrofit: React.FC = () => {
                                 <Edit className="h-3.5 w-3.5" />
                               </button>
                               <button
-                                onClick={() =>
-                                  item.id && handleExcluirInstrucao(item.id)
-                                }
+                                onClick={() => item.id && handleExcluirInstrucao(item.id)}
                                 className="p-1 bg-red-50 text-red-600 hover:bg-red-100 rounded"
                                 title="Excluir Instrução"
                               >
@@ -821,112 +780,162 @@ export const ConsultaAgrofit: React.FC = () => {
         </div>
       )}
 
+      {/* Modal de Cadastro / Edição de Instrução */}
       {modalInstrucaoAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] flex flex-col overflow-y-auto">
             <h3 className="text-lg font-bold text-gray-800 mb-4">
-              {instrucaoEmEdicao
-                ? "Editar Instrução de Uso"
-                : "Nova Instrução de Uso"}
+              {instrucaoEmEdicao ? "Editar Instrução de Uso" : "Nova Instrução de Uso"}
             </h3>
             <form onSubmit={handleSubmitInstrucao} className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Cultura
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formInstrucao.cultura}
-                  onChange={(e) =>
-                    setFormInstrucao({
-                      ...formInstrucao,
-                      cultura: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border rounded text-sm"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Cultura</label>
+                  <input
+                    type="text"
+                    required
+                    value={formInstrucao.cultura}
+                    onChange={(e) => setFormInstrucao({ ...formInstrucao, cultura: e.target.value })}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Praga (Nome Comum)</label>
+                  <input
+                    type="text"
+                    required
+                    value={formInstrucao.praga_nome_comum}
+                    onChange={(e) => setFormInstrucao({ ...formInstrucao, praga_nome_comum: e.target.value })}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
               </div>
+
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Praga (Nome Comum)
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formInstrucao.praga_nome_comum}
-                  onChange={(e) =>
-                    setFormInstrucao({
-                      ...formInstrucao,
-                      praga_nome_comum: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border rounded text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Praga (Nome Científico)
-                </label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Praga (Nome Científico)</label>
                 <input
                   type="text"
                   value={formInstrucao.praga_nome_cientifico}
-                  onChange={(e) =>
-                    setFormInstrucao({
-                      ...formInstrucao,
-                      praga_nome_cientifico: e.target.value,
-                    })
-                  }
+                  onChange={(e) => setFormInstrucao({ ...formInstrucao, praga_nome_cientifico: e.target.value })}
                   className="w-full px-3 py-2 border rounded text-sm"
                 />
               </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Dose Mín.</label>
+                  <input
+                    type="text"
+                    value={formInstrucao.dose_min}
+                    onChange={(e) => setFormInstrucao({ ...formInstrucao, dose_min: e.target.value })}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Dose Máx.</label>
+                  <input
+                    type="text"
+                    value={formInstrucao.dose_max}
+                    onChange={(e) => setFormInstrucao({ ...formInstrucao, dose_max: e.target.value })}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Unidade Dose</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: L/ha"
+                    value={formInstrucao.dose_unidade}
+                    onChange={(e) => setFormInstrucao({ ...formInstrucao, dose_unidade: e.target.value })}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Dose
-                </label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Forma de Aplicação</label>
                 <input
                   type="text"
-                  placeholder="Ex: 100 a 150 L/ha"
-                  value={formInstrucao.dose}
-                  onChange={(e) =>
-                    setFormInstrucao({ ...formInstrucao, dose: e.target.value })
-                  }
+                  placeholder="Ex: Tratorizado com Barra"
+                  value={formInstrucao.forma_aplicacao}
+                  onChange={(e) => setFormInstrucao({ ...formInstrucao, forma_aplicacao: e.target.value })}
                   className="w-full px-3 py-2 border rounded text-sm"
                 />
               </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Calda Mín.</label>
+                  <input
+                    type="text"
+                    value={formInstrucao.volume_calda_min}
+                    onChange={(e) => setFormInstrucao({ ...formInstrucao, volume_calda_min: e.target.value })}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Calda Máx.</label>
+                  <input
+                    type="text"
+                    value={formInstrucao.volume_calda_max}
+                    onChange={(e) => setFormInstrucao({ ...formInstrucao, volume_calda_max: e.target.value })}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Unidade Calda</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: L/ha"
+                    value={formInstrucao.volume_calda_unidade}
+                    onChange={(e) => setFormInstrucao({ ...formInstrucao, volume_calda_unidade: e.target.value })}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Nº Aplicações</label>
+                  <input
+                    type="text"
+                    value={formInstrucao.n_aplicacoes}
+                    onChange={(e) => setFormInstrucao({ ...formInstrucao, n_aplicacoes: e.target.value })}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Int. Reentrada</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 24h"
+                    value={formInstrucao.int_reentrada}
+                    onChange={(e) => setFormInstrucao({ ...formInstrucao, int_reentrada: e.target.value })}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Int. Segurança</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: N.D."
+                    value={formInstrucao.int_seguranca}
+                    onChange={(e) => setFormInstrucao({ ...formInstrucao, int_seguranca: e.target.value })}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Máx. Aplicações
-                </label>
-                <input
-                  type="text"
-                  value={formInstrucao.max_aplicacoes}
-                  onChange={(e) =>
-                    setFormInstrucao({
-                      ...formInstrucao,
-                      max_aplicacoes: e.target.value,
-                    })
-                  }
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Observação</label>
+                <textarea
+                  rows={3}
+                  value={formInstrucao.observacao}
+                  onChange={(e) => setFormInstrucao({ ...formInstrucao, observacao: e.target.value })}
                   className="w-full px-3 py-2 border rounded text-sm"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Volume de Calda
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ex: 200 a 400 L/ha"
-                  value={formInstrucao.volume_calda}
-                  onChange={(e) =>
-                    setFormInstrucao({
-                      ...formInstrucao,
-                      volume_calda: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border rounded text-sm"
-                />
-              </div>
+
               <div className="flex justify-end space-x-2 pt-4">
                 <button
                   type="button"
@@ -947,211 +956,129 @@ export const ConsultaAgrofit: React.FC = () => {
         </div>
       )}
 
+      {/* Modal Cadastro/Edição Produto */}
       {modalFormAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
           <div className="bg-white rounded-xl shadow-xl max-w-xl w-full p-6 my-8 max-h-[90vh] flex flex-col">
             <h3 className="text-lg font-bold text-gray-800 mb-4">
-              {produtoEmEdicao
-                ? "Editar Agrotóxico"
-                : "Cadastrar Novo Agrotóxico"}
+              {produtoEmEdicao ? "Editar Agrotóxico" : "Cadastrar Novo Agrotóxico"}
             </h3>
-            <form
-              onSubmit={handleSubmitForm}
-              className="space-y-3 overflow-y-auto pr-2 flex-1"
-            >
+            <form onSubmit={handleSubmitForm} className="space-y-3 overflow-y-auto pr-2 flex-1">
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Número de Registro
-                </label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Número de Registro</label>
                 <input
                   type="text"
                   required
                   disabled={!!produtoEmEdicao}
                   value={formData.numero_registro}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      numero_registro: e.target.value,
-                    })
-                  }
+                  onChange={(e) => setFormData({ ...formData, numero_registro: e.target.value })}
                   className="w-full px-3 py-2 border rounded text-sm disabled:bg-gray-100"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Marca Comercial
-                </label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Marca Comercial</label>
                 <input
                   type="text"
                   required
                   value={formData.marca_comercial}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      marca_comercial: e.target.value,
-                    })
-                  }
+                  onChange={(e) => setFormData({ ...formData, marca_comercial: e.target.value })}
                   className="w-full px-3 py-2 border rounded text-sm"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Titular do Registro
-                </label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Titular do Registro</label>
                 <input
                   type="text"
                   value={formData.titular_registro}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      titular_registro: e.target.value,
-                    })
-                  }
+                  onChange={(e) => setFormData({ ...formData, titular_registro: e.target.value })}
                   className="w-full px-3 py-2 border rounded text-sm"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Ingrediente Ativo
-                </label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Ingrediente Ativo</label>
                 <input
                   type="text"
                   value={formData.ingrediente_ativo}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      ingrediente_ativo: e.target.value,
-                    })
-                  }
+                  onChange={(e) => setFormData({ ...formData, ingrediente_ativo: e.target.value })}
                   className="w-full px-3 py-2 border rounded text-sm"
                 />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Formulação
-                  </label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Formulação</label>
                   <input
                     type="text"
                     value={formData.formulacao}
-                    onChange={(e) =>
-                      setFormData({ ...formData, formulacao: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, formulacao: e.target.value })}
                     className="w-full px-3 py-2 border rounded text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Grupo Químico
-                  </label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Grupo Químico</label>
                   <input
                     type="text"
                     value={formData.grupo_quimico}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        grupo_quimico: e.target.value,
-                      })
-                    }
+                    onChange={(e) => setFormData({ ...formData, grupo_quimico: e.target.value })}
                     className="w-full px-3 py-2 border rounded text-sm"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Classe Toxicológica
-                  </label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Classe Toxicológica</label>
                   <input
                     type="text"
                     value={formData.classe_toxicologica}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        classe_toxicologica: e.target.value,
-                      })
-                    }
+                    onChange={(e) => setFormData({ ...formData, classe_toxicologica: e.target.value })}
                     className="w-full px-3 py-2 border rounded text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Classe / Categoria Agronômica
-                  </label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Classe / Categoria Agronômica</label>
                   <input
                     type="text"
                     value={formData.classe_categoria_agronomica}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        classe_categoria_agronomica: e.target.value,
-                      })
-                    }
+                    onChange={(e) => setFormData({ ...formData, classe_categoria_agronomica: e.target.value })}
                     className="w-full px-3 py-2 border rounded text-sm"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Técnica de Aplicação
-                  </label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Técnica de Aplicação</label>
                   <input
                     type="text"
                     value={formData.tecnica_aplicacao}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        tecnica_aplicacao: e.target.value,
-                      })
-                    }
+                    onChange={(e) => setFormData({ ...formData, tecnica_aplicacao: e.target.value })}
                     className="w-full px-3 py-2 border rounded text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Classificação Ambiental
-                  </label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Classificação Ambiental</label>
                   <input
                     type="text"
                     value={formData.classificacao_ambiental}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        classificacao_ambiental: e.target.value,
-                      })
-                    }
+                    onChange={(e) => setFormData({ ...formData, classificacao_ambiental: e.target.value })}
                     className="w-full px-3 py-2 border rounded text-sm"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Unidade de Medida
-                  </label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Unidade de Medida</label>
                   <input
                     type="text"
                     value={formData.unidade_medida}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        unidade_medida: e.target.value,
-                      })
-                    }
+                    onChange={(e) => setFormData({ ...formData, unidade_medida: e.target.value })}
                     className="w-full px-3 py-2 border rounded text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    URL da Bula
-                  </label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">URL da Bula</label>
                   <input
                     type="text"
                     value={formData.url}
-                    onChange={(e) =>
-                      setFormData({ ...formData, url: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, url: e.target.value })}
                     className="w-full px-3 py-2 border rounded text-sm"
                   />
                 </div>
@@ -1161,9 +1088,7 @@ export const ConsultaAgrofit: React.FC = () => {
                   <input
                     type="checkbox"
                     checked={formData.inflamavel}
-                    onChange={(e) =>
-                      setFormData({ ...formData, inflamavel: e.target.checked })
-                    }
+                    onChange={(e) => setFormData({ ...formData, inflamavel: e.target.checked })}
                     className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
                   />
                   <span>Inflamável</span>
@@ -1172,9 +1097,7 @@ export const ConsultaAgrofit: React.FC = () => {
                   <input
                     type="checkbox"
                     checked={formData.corrosivo}
-                    onChange={(e) =>
-                      setFormData({ ...formData, corrosivo: e.target.checked })
-                    }
+                    onChange={(e) => setFormData({ ...formData, corrosivo: e.target.checked })}
                     className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
                   />
                   <span>Corrosivo</span>
