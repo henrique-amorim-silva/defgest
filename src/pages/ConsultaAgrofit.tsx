@@ -120,7 +120,7 @@ export const ConsultaAgrofit: React.FC = () => {
   const [itensPorPagina, setItensPorPagina] = useState<number | "todos">(10);
   const [totalRegistros, setTotalRegistros] = useState(0);
 
-  const carregarCatalogo = async (filtrosAtuais = filtros, signal?: AbortSignal) => {
+  const carregarCatalogo = async (filtrosAtuais = filtros) => {
     setCarregando(true);
     setErro(null);
     try {
@@ -232,14 +232,12 @@ export const ConsultaAgrofit: React.FC = () => {
   };
 
   useEffect(() => {
-    const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      carregarCatalogo(filtros, controller.signal);
+      carregarCatalogo(filtros);
     }, 300);
 
     return () => {
       clearTimeout(timeoutId);
-      controller.abort();
     };
   }, [filtros, paginaAtual, itensPorPagina]);
 
