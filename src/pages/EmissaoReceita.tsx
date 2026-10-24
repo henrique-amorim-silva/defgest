@@ -1,5 +1,7 @@
+// src/components/EmissaoReceita.tsx
 import React, { useState, useEffect } from "react";
 import { sincronizarCatalogoAgrofit } from "../services/agrofitApi";
+import { supabase } from "../services/api";
 import type { ItemEstoque } from "../@types/estoque";
 import type { ReceitaAgronomica } from "../@types/receita";
 import type {
@@ -26,7 +28,6 @@ export const EmissaoReceita: React.FC = () => {
   >([]);
   const [receitas, setReceitas] = useState<ReceitaAgronomica[]>([]);
 
-  // Modos adicionados: "detalhes" para visualizar a 2ª via
   const [modo, setModo] = useState<
     "lista" | "formulario" | "sucesso" | "detalhes"
   >("lista");
@@ -34,17 +35,13 @@ export const EmissaoReceita: React.FC = () => {
     null,
   );
 
-  // Estado para o filtro/busca na lista
   const [filtroBusca, setFiltroBusca] = useState("");
 
-  // Função auxiliar centralizada para capturar o ID da empresa ativa do sistema
   const obterEmpresaAtivaId = () => {
     try {
-      // 1. Tenta chaves diretas caso existam em algum fluxo
       const direta = localStorage.getItem("empresaId") || localStorage.getItem("empresaAtivaId") || sessionStorage.getItem("empresaId");
       if (direta) return direta;
 
-      // 2. Tenta extrair do objeto usuário salvo no localStorage
       const usuarioStr = localStorage.getItem("usuario");
       if (usuarioStr) {
         const usuarioObj = JSON.parse(usuarioStr);
@@ -52,14 +49,10 @@ export const EmissaoReceita: React.FC = () => {
         if (usuarioObj?.empresaId) return String(usuarioObj.empresaId);
       }
 
-      // 3. Fallback inteligente: Tenta capturar o valor do select de empresa ativo no cabeçalho da página
-      // Procura pelo select que fica na barra superior (header)
       const selects = document.querySelectorAll("header select, nav select, select");
       for (const sel of selects) {
-        // Se o select tiver opções que parecem IDs de empresa (valores numéricos válidos e diferentes de vazio)
         if (sel && (sel as HTMLSelectElement).value) {
           const val = (sel as HTMLSelectElement).value;
-          // Ignora se for o select de produtos/culturas da própria receita
           if (!sel.closest("form") && !isNaN(Number(val)) && Number(val) > 0) {
             return val;
           }
@@ -83,7 +76,6 @@ export const EmissaoReceita: React.FC = () => {
     [],
   );
 
-  // Seleção e correlação do item atual
   const [produtoSelecionadoId, setProdutoSelecionadoId] = useState("");
   const [culturaSelecionada, setCulturaSelecionada] = useState("");
   const [pragaSelecionadaIndex, setPragaSelecionadaIndex] = useState<
@@ -94,7 +86,6 @@ export const EmissaoReceita: React.FC = () => {
   const [dosagemUtilizada, setDosagemUtilizada] = useState("");
   const [volumeCaldaUtilizado, setVolumeCaldaUtilizado] = useState("");
 
-  // Listas auxiliares filtradas para os selects dependentes
   const [culturasDisponiveis, setCulturasDisponiveis] = useState<string[]>([]);
   const [pragasDisponiveis, setPragasDisponiveis] = useState<
     IndicacaoUsoAgrofit[]
@@ -105,11 +96,9 @@ export const EmissaoReceita: React.FC = () => {
   const [receitaEmitida, setReceitaEmitida] =
     useState<ReceitaAgronomica | null>(null);
 
-  // Estado para receita selecionada para visualização de detalhes
   const [receitaVisualizada, setReceitaVisualizada] =
     useState<ReceitaAgronomica | null>(null);
 
-  // Monitora mudanças na empresa ativa (caso o usuário troque no select do topo)
   useEffect(() => {
     const verificarTrocaEmpresa = () => {
       const novaEmpresa = obterEmpresaAtivaId();
@@ -127,54 +116,82 @@ export const EmissaoReceita: React.FC = () => {
     };
   }, [empresaAtual]);
 
-  // Sempre que a empresaAtual mudar, recarrega os dados do backend
   useEffect(() => {
     carregarDadosIniciais();
   }, [empresaAtual]);
 
   const carregarDadosIniciais = async () => {
     try {
-      const apiUrl =
-        import.meta.env.VITE_API_URL || "http://localhost:3001/api";
-      const token = localStorage.getItem("token");
       const empresaIdAtiva = obterEmpresaAtivaId();
 
-      const headers = {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-        "ngrok-skip-browser-warning": "true",
-      };
+      // 1. Carrega Estoque do Supabase
+      let queryEstoque = supabase.from('estoque').select('*, lote_validade(*)');
+      if (empresaIdAtiva) {
+        queryEstoque = queryEstoque.eq('empresa_id', empresaIdAtiva);
+      }
+      const { data: dadosEstoque, error: errEstoque } = await queryEstoque;
+      if (errEstoque) throw errEstoque;
 
-      const resEstoque = await fetch(
-        `${apiUrl}/estoque?empresaId=${empresaIdAtiva}`,
-        { headers },
-      );
-      if (resEstoque.ok) {
-        const dadosEstoque = await resEstoque.json();
-        const listaFinalEstoque = Array.isArray(dadosEstoque)
-          ? dadosEstoque
-          : dadosEstoque.itens ||
-            dadosEstoque.data ||
-            dadosEstoque.produtos ||
-            [];
-
-        setEstoque(listaFinalEstoque);
+      if (Array.isArray(dadosEstoque)) {
+        const estoqueMapeado = dadosEstoque.map((item: any) => ({
+          id: item.id,
+          empresaId: item.empresa_id,
+          nomeProduto: item.nome_produto,
+          unidade: item.unidade,
+          embalagem: item.embalagem,
+          estMin: item.est_min,
+          lotes: Array.isArray(item.lote_validade)
+            ? item.lote_validade.map((l: any) => ({
+                id: l.id,
+                lote: l.lote,
+                quantidadeAtual: l.quantidade_atual,
+                dataValidade: l.data_validade,
+              }))
+            : []
+        }));
+        setEstoque(estoqueMapeado);
       }
 
-      const resReceitas = await fetch(
-        `${apiUrl}/receitas?empresaId=${empresaIdAtiva}`,
-        { headers },
-      );
-      if (resReceitas.ok) {
-        const dadosReceitas = await resReceitas.json();
-        const listaFinalReceitas = Array.isArray(dadosReceitas)
-          ? dadosReceitas
-          : dadosReceitas.receitas ||
-            dadosReceitas.data ||
-            dadosReceitas.itens ||
-            [];
+      // 2. Carrega Receitas da tabela correta: receitas_agronomicas
+      let queryReceitas = supabase.from('receitas_agronomicas').select('*, itens_receita(*)');
+      if (empresaIdAtiva) {
+        queryReceitas = queryReceitas.eq('empresa_id', empresaIdAtiva);
+      }
+      const { data: dadosReceitas, error: errRec } = await queryReceitas;
+      if (errRec) throw errRec;
 
-        setReceitas(listaFinalReceitas);
+      if (Array.isArray(dadosReceitas)) {
+        const receitasMapeadas = dadosReceitas.map((r: any) => ({
+          id: r.id,
+          numeroReceita: r.numero_receita,
+          produtorNome: r.produtor_nome,
+          produtorCpfCnpj: r.produtor_cpf_cnpj,
+          propriedadeNome: r.propriedade_nome,
+          orientacoes: r.orientacoes,
+          dataEmissao: r.data_emissao,
+          empresaId: r.empresa_id,
+          itens: Array.isArray(r.itens_receita)
+            ? r.itens_receita.map((i: any) => ({
+                produtoId: String(i.estoque_id),
+                nomeProduto: i.nome_produto,
+                cultura: i.cultura,
+                pragaNomeComum: i.praga_nome_comum,
+                pragaNomeCientifico: i.praga_nome_cientifico,
+                modoAplicacao: i.modo_aplicacao,
+                dosagemMin: 0,
+                dosagemMax: 0,
+                dosagemUtilizada: i.dosagem_utilizada,
+                unidadeDosagem: i.unidade_dosagem,
+                volumeCaldaMin: 0,
+                volumeCaldaMax: 0,
+                volumeCaldaUtilizado: i.volume_calda_utilizado,
+                unidadeVolumeCalda: i.unidade_volume_calda,
+                areaAplicacaoHectares: i.area_aplicacao_hectares,
+                quantidadeRecomendada: i.quantidade_recomendada,
+              }))
+            : []
+        }));
+        setReceitas(receitasMapeadas);
       }
 
       const catalogo = await sincronizarCatalogoAgrofit();
@@ -217,9 +234,7 @@ export const EmissaoReceita: React.FC = () => {
     setVolumeCaldaUtilizado("");
 
     const itemEstoque = estoque.find(
-      (e: any) =>
-        String(e.id || e._id || e.produtoId || e.produto_id) ===
-        String(idEstoque),
+      (e: any) => String(e.id) === String(idEstoque),
     );
     if (!itemEstoque) {
       setCulturasDisponiveis(["Geral / Outras"]);
@@ -227,14 +242,10 @@ export const EmissaoReceita: React.FC = () => {
     }
 
     const itemGen = itemEstoque as any;
-    const nomeProd =
-      itemGen.nomeProduto || itemGen.nome_produto || itemGen.nome || "";
-    const pId = itemGen.produtoId || itemGen.produto_id;
+    const nomeProd = itemGen.nomeProduto || "";
 
     const prodAgrofit = catalogoAgrofit.find(
-      (p) =>
-        String(p.id) === String(pId) ||
-        p.nomeComercial?.toLowerCase() === nomeProd.toLowerCase(),
+      (p) => p.nomeComercial?.toLowerCase() === nomeProd.toLowerCase(),
     );
 
     if (
@@ -266,21 +277,15 @@ export const EmissaoReceita: React.FC = () => {
     setVolumeCaldaUtilizado("");
 
     const itemEstoque = estoque.find(
-      (e: any) =>
-        String(e.id || e._id || e.produtoId || e.produto_id) ===
-        String(produtoSelecionadoId),
+      (e: any) => String(e.id) === String(produtoSelecionadoId),
     );
     if (!itemEstoque) return;
 
     const itemGen = itemEstoque as any;
-    const nomeProd =
-      itemGen.nomeProduto || itemGen.nome_produto || itemGen.nome || "";
-    const pId = itemGen.produtoId || itemGen.produto_id;
+    const nomeProd = itemGen.nomeProduto || "";
 
     const prodAgrofit = catalogoAgrofit.find(
-      (p) =>
-        String(p.id) === String(pId) ||
-        p.nomeComercial?.toLowerCase() === nomeProd.toLowerCase(),
+      (p) => p.nomeComercial?.toLowerCase() === nomeProd.toLowerCase(),
     );
 
     if (prodAgrofit && prodAgrofit.indicacoesUso) {
@@ -320,9 +325,7 @@ export const EmissaoReceita: React.FC = () => {
     }
 
     const itemEstoque = estoque.find(
-      (e: any) =>
-        String(e.id || e._id || e.produtoId || e.produto_id) ===
-        String(produtoSelecionadoId),
+      (e: any) => String(e.id) === String(produtoSelecionadoId),
     );
     if (!itemEstoque) {
       alert("Produto selecionado não encontrado no estoque.");
@@ -335,12 +338,10 @@ export const EmissaoReceita: React.FC = () => {
     const areaNum = Number(area) || 0;
 
     const quantidadeTotal = dosagemNum > 0 ? dosagemNum * areaNum : 1;
-    const qtdEstoqueAtual = Number(
-      itemGen.quantidadeAtual ??
-        itemGen.quantidade_atual ??
-        itemGen.quantidade ??
-        0,
-    );
+    
+    const qtdEstoqueAtual = Array.isArray(itemGen.lotes)
+      ? itemGen.lotes.reduce((acc: number, l: any) => acc + Number(l.quantidadeAtual || 0), 0)
+      : 0;
 
     let qtdJaNaReceita = 0;
     if (receitaEmEdicaoId) {
@@ -348,9 +349,7 @@ export const EmissaoReceita: React.FC = () => {
         (r) => String(r.id) === String(receitaEmEdicaoId),
       );
       const itemAntigo = receitaAntiga?.itens?.find(
-        (i: any) =>
-          String(i.estoqueId || i.produtoId) ===
-          String(itemGen.id || itemGen._id || itemGen.produtoId),
+        (i: any) => String(i.produtoId) === String(itemGen.id),
       );
       if (itemAntigo) qtdJaNaReceita = itemAntigo.quantidadeRecomendada;
     }
@@ -363,33 +362,22 @@ export const EmissaoReceita: React.FC = () => {
       return;
     }
 
-    const nomeProdFinal =
-      itemGen.nomeProduto ||
-      itemGen.nome_produto ||
-      itemGen.nome ||
-      "Produto sem nome";
-
-    const produtoIdReal =
-      itemGen.id ||
-      itemGen._id ||
-      itemGen.produtoId ||
-      itemGen.produto_id ||
-      produtoSelecionadoId;
+    const nomeProdFinal = itemGen.nomeProduto || "Produto sem nome";
+    const produtoIdReal = itemGen.id;
 
     const novoItemReceita: any = {
-      estoqueId: Number(produtoIdReal),
-      produtoId: Number(produtoIdReal),
+      produtoId: String(produtoIdReal),
       nomeProduto: nomeProdFinal,
       cultura: culturaSelecionada,
       pragaNomeComum: indicacaoAtiva?.pragaNomeComum || "Aplicação Geral",
       pragaNomeCientifico: indicacaoAtiva?.pragaNomeCientifico || "",
       modoAplicacao: indicacaoAtiva?.modoAplicacao || "Terrestre",
-      dosagemMin: indicacaoAtiva?.doseMin || 0,
-      dosagemMax: indicacaoAtiva?.doseMax || 0,
+      dosagemMin: Number(indicacaoAtiva?.doseMin || 0),
+      dosagemMax: Number(indicacaoAtiva?.doseMax || 0),
       dosagemUtilizada: dosagemNum,
       unidadeDosagem: indicacaoAtiva?.doseUnid || itemGen.unidade || "unid",
-      volumeCaldaMin: indicacaoAtiva?.vCaldaMin || 0,
-      volumeCaldaMax: indicacaoAtiva?.vCaldaMax || 0,
+      volumeCaldaMin: Number(indicacaoAtiva?.vCaldaMin || 0),
+      volumeCaldaMax: Number(indicacaoAtiva?.vCaldaMax || 0),
       volumeCaldaUtilizado: volumeCaldaNum,
       unidadeVolumeCalda: indicacaoAtiva?.vCaldaUnid || "L/ha",
       areaAplicacaoHectares: areaNum,
@@ -412,63 +400,103 @@ export const EmissaoReceita: React.FC = () => {
     }
 
     try {
-      const apiUrl =
-        import.meta.env.VITE_API_URL || "http://localhost:3001/api";
-      const token = localStorage.getItem("token");
-      const headers = {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      };
-
       const empresaIdAtiva = obterEmpresaAtivaId();
+      const numeroReceitaGerado = `REC-${Date.now().toString().slice(-6)}`;
 
-      const payload = {
-        empresaId: Number(empresaIdAtiva),
-        numeroReceita: `REC-${Date.now().toString().slice(-6)}`,
-        produtorNome,
-        produtorCpfCnpj,
-        propriedadeNome,
-        itens: itensReceita.map((item: any) => ({
-          ...item,
-          estoqueId: Number(item.estoqueId || item.produtoId),
-          produtoId: Number(item.produtoId || item.estoqueId),
-        })),
-        orientacoes,
-      };
-
-      let response;
       if (receitaEmEdicaoId) {
-        response = await fetch(`${apiUrl}/receitas/${receitaEmEdicaoId}`, {
-          method: "PUT",
-          headers,
-          body: JSON.stringify(payload),
+        const { error: updateError } = await supabase
+          .from('receitas_agronomicas')
+          .update({
+            produtor_nome: produtorNome,
+            produtor_cpf_cnpj: produtorCpfCnpj,
+            propriedade_nome: propriedadeNome,
+            orientacoes: orientacoes,
+          })
+          .eq('id', receitaEmEdicaoId);
+
+        if (updateError) throw updateError;
+
+        await supabase.from('itens_receita').delete().eq('receita_id', receitaEmEdicaoId);
+
+        const itensFormatados = itensReceita.map((item: any) => ({
+          receita_id: Number(receitaEmEdicaoId),
+          estoque_id: Number(item.produtoId),
+          nome_produto: item.nomeProduto,
+          cultura: item.cultura,
+          praga_nome_comum: item.pragaNomeComum,
+          praga_nome_cientifico: item.pragaNomeCientifico,
+          modo_aplicacao: item.modoAplicacao,
+          dosagem_utilizada: item.dosagemUtilizada,
+          unidade_dosagem: item.unidadeDosagem,
+          volume_calda_utilizado: item.volumeCaldaUtilizado,
+          unidade_volume_calda: item.unidadeVolumeCalda,
+          area_aplicacao_hectares: item.areaAplicacaoHectares,
+          quantidade_recomendada: item.quantidadeRecomendada,
+        }));
+
+        const { error: itensError } = await supabase.from('itens_receita').insert(itensFormatados);
+        if (itensError) throw itensError;
+
+        setReceitaEmitida({
+          id: receitaEmEdicaoId,
+          numeroReceita: numeroReceitaGerado,
+          produtorNome,
+          produtorCpfCnpj,
+          propriedadeNome,
+          orientacoes,
+          dataEmissao: new Date().toLocaleDateString(),
+          itens: itensReceita,
         });
       } else {
-        response = await fetch(`${apiUrl}/receitas`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(payload),
+        const { data: novaRec, error: recError } = await supabase
+          .from('receitas_agronomicas')
+          .insert([{
+            empresa_id: Number(empresaIdAtiva),
+            numero_receita: numeroReceitaGerado,
+            produtor_nome: produtorNome,
+            produtor_cpf_cnpj: produtorCpfCnpj,
+            propriedade_nome: propriedadeNome,
+            orientacoes: orientacoes,
+            data_emissao: new Date().toISOString()
+          }])
+          .select()
+          .single();
+
+        if (recError) throw recError;
+        const receitaId = novaRec.id;
+
+        const itensFormatados = itensReceita.map((item: any) => ({
+          receita_id: receitaId,
+          estoque_id: Number(item.produtoId),
+          nome_produto: item.nomeProduto,
+          cultura: item.cultura,
+          praga_nome_comum: item.pragaNomeComum,
+          praga_nome_cientifico: item.pragaNomeCientifico,
+          modo_aplicacao: item.modoAplicacao,
+          dosagem_utilizada: item.dosagemUtilizada,
+          unidade_dosagem: item.unidadeDosagem,
+          volume_calda_utilizado: item.volumeCaldaUtilizado,
+          unidade_volume_calda: item.unidadeVolumeCalda,
+          area_aplicacao_hectares: item.areaAplicacaoHectares,
+          quantidade_recomendada: item.quantidadeRecomendada,
+        }));
+
+        const { error: itensError } = await supabase.from('itens_receita').insert(itensFormatados);
+        if (itensError) throw itensError;
+
+        setReceitaEmitida({
+          id: String(receitaId),
+          numeroReceita: numeroReceitaGerado,
+          produtorNome,
+          produtorCpfCnpj,
+          propriedadeNome,
+          orientacoes,
+          dataEmissao: new Date().toLocaleDateString(),
+          itens: itensReceita,
         });
       }
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.erro || "Erro ao salvar a receita.");
-      }
-
-      const receitaFinal = receitaEmEdicaoId
-        ? {
-            ...payload,
-            id: Number(receitaEmEdicaoId),
-            dataEmissao: new Date().toLocaleDateString(),
-          }
-        : data;
-
-      setReceitaEmitida(receitaFinal);
-
       await carregarDadosIniciais();
-
       setModo("sucesso");
     } catch (err: any) {
       alert(err.message || "Erro ao salvar a receita.");
@@ -476,28 +504,11 @@ export const EmissaoReceita: React.FC = () => {
   };
 
   const handleExcluirReceita = async (id: number | string) => {
-    if (
-      !window.confirm(
-        "Tem certeza que deseja excluir esta receita? Os produtos serão devolvidos ao estoque.",
-      )
-    )
-      return;
+    if (!window.confirm("Tem certeza que deseja excluir esta receita?")) return;
 
     try {
-      const apiUrl =
-        import.meta.env.VITE_API_URL || "http://localhost:3001/api";
-      const token = localStorage.getItem("token");
-
-      const response = await fetch(`${apiUrl}/receitas/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.erro || "Erro ao excluir a receita.");
-      }
-
+      const { error } = await supabase.from('receitas_agronomicas').delete().eq('id', id);
+      if (error) throw error;
       carregarDadosIniciais();
     } catch (err: any) {
       alert(err.message || "Erro ao excluir receita.");
@@ -521,21 +532,9 @@ export const EmissaoReceita: React.FC = () => {
 
   const receitasFiltradas = receitas.filter((rec: any) => {
     const termo = filtroBusca.toLowerCase();
-    const produtor = (
-      rec.produtorNome ||
-      rec.produtor_nome ||
-      ""
-    ).toLowerCase();
-    const numero = (
-      rec.numeroReceita ||
-      rec.numero_receita ||
-      ""
-    ).toLowerCase();
-    const propriedade = (
-      rec.propriedadeNome ||
-      rec.propriedade_nome ||
-      ""
-    ).toLowerCase();
+    const produtor = (rec.produtorNome || "").toLowerCase();
+    const numero = (rec.numeroReceita || "").toLowerCase();
+    const propriedade = (rec.propriedadeNome || "").toLowerCase();
 
     return (
       produtor.includes(termo) ||
@@ -556,7 +555,7 @@ export const EmissaoReceita: React.FC = () => {
                   Emissão de Receitas Agronômicas
                 </h2>
                 <p className="text-sm text-gray-500">
-                  Histórico e gerenciamento de receitas emitidas.
+                  Histórico e gerenciamento de receitas emitidas via Supabase.
                 </p>
               </div>
             </div>
@@ -609,49 +608,14 @@ export const EmissaoReceita: React.FC = () => {
                         {rec.numeroReceita}
                       </span>
                       <span className="text-xs text-gray-500">
-                        Data:{" "}
-                        {(() => {
-                          const r = rec as any;
-                          const dataBruta =
-                            r.createdAt ||
-                            r.created_at ||
-                            r.dataEmissao ||
-                            r.data_emissao;
-                          return dataBruta
-                            ? new Date(dataBruta).toLocaleDateString()
-                            : "Data não informada";
-                        })()}
+                        Data: {rec.dataEmissao ? new Date(rec.dataEmissao).toLocaleDateString() : "Data não informada"}
                       </span>
                     </div>
                     <p className="text-sm font-medium text-gray-800">
-                      Produtor:{" "}
-                      {(() => {
-                        const r = rec as any;
-                        const nome =
-                          r.produtorNome ||
-                          r.produtor_nome ||
-                          r.nomeProdutor ||
-                          "Não informado";
-                        const cpfCnpj =
-                          r.produtorCpfCnpj ||
-                          r.produtor_cpf_cnpj ||
-                          r.cpfCnpj ||
-                          "";
-                        return `${nome}${cpfCnpj ? ` (${cpfCnpj})` : ""}`;
-                      })()}
+                      Produtor: {rec.produtorNome} {rec.produtorCpfCnpj ? `(${rec.produtorCpfCnpj})` : ""}
                     </p>
                     <p className="text-xs text-gray-600">
-                      Propriedade:{" "}
-                      {(() => {
-                        const r = rec as any;
-                        return (
-                          r.propriedadeNome ||
-                          r.propriedade_nome ||
-                          r.nomePropriedade ||
-                          "Não informada"
-                        );
-                      })()}{" "}
-                      | Itens: {rec.itens?.length || 0} produto(s)
+                      Propriedade: {rec.propriedadeNome || "Não informada"} | Itens: {rec.itens?.length || 0} produto(s)
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -716,17 +680,7 @@ export const EmissaoReceita: React.FC = () => {
                   Data de Emissão
                 </p>
                 <p className="font-medium">
-                  {(() => {
-                    const r = receitaVisualizada as any;
-                    const dataBruta =
-                      r.createdAt ||
-                      r.created_at ||
-                      r.dataEmissao ||
-                      r.data_emissao;
-                    return dataBruta
-                      ? new Date(dataBruta).toLocaleDateString()
-                      : "-";
-                  })()}
+                  {receitaVisualizada.dataEmissao ? new Date(receitaVisualizada.dataEmissao).toLocaleDateString() : "-"}
                 </p>
               </div>
             </div>
@@ -738,8 +692,7 @@ export const EmissaoReceita: React.FC = () => {
                 </p>
                 <p className="font-medium">{receitaVisualizada.produtorNome}</p>
                 <p className="text-xs text-gray-600">
-                  CPF/CNPJ:{" "}
-                  {receitaVisualizada.produtorCpfCnpj || "Não informado"}
+                  CPF/CNPJ: {receitaVisualizada.produtorCpfCnpj || "Não informado"}
                 </p>
               </div>
               <div>
@@ -900,31 +853,16 @@ export const EmissaoReceita: React.FC = () => {
                     <option value="">
                       Selecione o produto ({estoque.length} no estoque)...
                     </option>
-                    {estoque.map((item, idx) => {
-                      const itemGenerico = item as any;
-                      const itemId =
-                        itemGenerico.id ||
-                        itemGenerico._id ||
-                        itemGenerico.produtoId ||
-                        itemGenerico.produto_id ||
-                        idx;
-                      const nomeP =
-                        itemGenerico.nomeProduto ||
-                        itemGenerico.nome_produto ||
-                        itemGenerico.nome ||
-                        "Produto sem nome";
-                      const qtdP =
-                        itemGenerico.quantidadeAtual ??
-                        itemGenerico.quantidade_atual ??
-                        itemGenerico.quantidade ??
-                        0;
-                      const undP = itemGenerico.unidade || "";
+                    {estoque.map((item) => {
+                      const qtdTotal = Array.isArray(item.lotes)
+                        ? item.lotes.reduce((acc, l) => acc + Number(l.quantidadeAtual || 0), 0)
+                        : 0;
 
-                      if (Number(qtdP) <= 0) return null;
+                      if (qtdTotal <= 0) return null;
 
                       return (
-                        <option key={itemId} value={itemId}>
-                          {nomeP} (Saldo: {qtdP} {undP})
+                        <option key={item.id} value={item.id}>
+                          {item.nomeProduto} (Saldo: {qtdTotal} {item.unidade || ""})
                         </option>
                       );
                     })}

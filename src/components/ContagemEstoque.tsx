@@ -1,5 +1,6 @@
+// src/components/ContagemEstoque.tsx
 import React, { useState, useEffect } from "react";
-import { apiRequest } from "../services/api";
+import { supabase } from "../services/api";
 import {
   ClipboardList,
   CheckCircle2,
@@ -78,7 +79,7 @@ export const ContagemEstoque: React.FC<ContagemEstoqueProps> = ({
     try {
       if (empresaSelecionada) {
         if (isAdminMaster) {
-          const empresasData = await apiRequest("empresas");
+          const { data: empresasData } = await supabase.from('empresas').select('*');
           if (Array.isArray(empresasData)) {
             const encontrada = empresasData.find(
               (e: Empresa) => e.id.toString() === empresaSelecionada,
@@ -100,26 +101,31 @@ export const ContagemEstoque: React.FC<ContagemEstoqueProps> = ({
         );
       }
 
-      const query = empresaSelecionada
-        ? `?empresa_id=${empresaSelecionada}`
-        : "";
-      let data = await apiRequest(`estoque${query}`);
+      // Buscar produtos do estoque com suporte a filtro de empresa
+      let queryEstoque = supabase.from('estoque').select('*, lote_validade(*)');
+      if (empresaSelecionada) {
+        queryEstoque = queryEstoque.eq('empresa_id', empresaSelecionada);
+      }
+
+      let { data, error } = await queryEstoque;
+      if (error) throw error;
 
       if (!Array.isArray(data) || data.length === 0) {
-        data = await apiRequest("estoque");
+        const { data: fallbackData } = await supabase.from('estoque').select('*, lote_validade(*)');
+        data = fallbackData;
       }
 
       if (Array.isArray(data)) {
         setProdutos(data);
 
-        // Tentar carregar rascunho salvo no Banco de Dados
+        // Tentar carregar rascunho salvo no Supabase (tabela contagem_temporaria ou equivalente)
         try {
-          const queryRascunho = empresaSelecionada
-            ? `?empresa_id=${empresaSelecionada}`
-            : "";
-          const rascunhoRes = await apiRequest(
-            `estoque/inventario/rascunho${queryRascunho}`,
-          );
+          let queryRascunho = supabase.from('contagem_temporaria').select('*');
+          if (empresaSelecionada) {
+            queryRascunho = queryRascunho.eq('empresa_id', empresaSelecionada);
+          }
+          const { data: rascunhoRes } = await queryRascunho.maybeSingle();
+
           if (
             rascunhoRes &&
             Array.isArray(rascunhoRes.itens) &&
@@ -158,13 +164,14 @@ export const ContagemEstoque: React.FC<ContagemEstoqueProps> = ({
 
   const salvarRascunhoNoServidor = async (novasLinhas: ItemContadoLinha[]) => {
     try {
-      await apiRequest("estoque/inventario/rascunho", {
-        method: "POST",
-        body: JSON.stringify({
-          itens: novasLinhas,
-          empresaId: empresaSelecionada ? Number(empresaSelecionada) : 1,
-        }),
-      });
+      const empresaIdVal = empresaSelecionada ? Number(empresaSelecionada) : 1;
+      
+      // Upsert do rascunho na tabela contagem_temporaria do Supabase
+      await supabase.from('contagem_temporaria').upsert({
+        empresa_id: empresaIdVal,
+        itens: novasLinhas,
+        atualizado_em: new Date().toISOString()
+      }, { onConflict: 'empresa_id' });
     } catch (err) {
       console.error("Erro ao sincronizar rascunho:", err);
     }
@@ -246,41 +253,16 @@ export const ContagemEstoque: React.FC<ContagemEstoqueProps> = ({
 
     setEnviando(true);
     try {
-      const payload = {
-        itensContados,
-        empresaId: empresaSelecionada ? Number(empresaSelecionada) : null,
-      };
+      const empresaIdVal = empresaSelecionada ? Number(empresaSelecionada) : null;
 
-      const resposta = await apiRequest("estoque/processar-inventario", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-
-      // Apagar o rascunho do banco de dados após sucesso
-      const queryRascunho = empresaSelecionada
-        ? `?empresa_id=${empresaSelecionada}`
-        : "";
-      await apiRequest(`estoque/inventario/rascunho${queryRascunho}`, {
-        method: "DELETE",
-      });
-
-      if (resposta && resposta.divergencias) {
-        setResultadoDivergencias(resposta.divergencias);
-      } else {
-        alert("Contagem processada com sucesso!");
-        onFechar();
+      // Apagar o rascunho do banco após finalizar
+      let deleteQuery = supabase.from('contagem_temporaria').delete();
+      if (empresaIdVal) {
+        deleteQuery = deleteQuery.eq('empresa_id', empresaIdVal);
       }
-    } catch (err: any) {
-      console.error("Erro ao processar inventário:", err);
+      await deleteQuery;
 
-      // Mesmo se houver falha de rota na API mas gerarmos em fallback, limpamos o rascunho do servidor
-      const queryRascunho = empresaSelecionada
-        ? `?empresa_id=${empresaSelecionada}`
-        : "";
-      await apiRequest(`estoque/inventario/rascunho${queryRascunho}`, {
-        method: "DELETE",
-      }).catch(() => {});
-
+      // Calcular divergências comparando com o estoque atual carregado
       const divergenciasCalculadas: Divergencia[] = itensContados.map(
         (item) => {
           const prod = produtos.find((p) => p.id === item.estoqueId);
@@ -298,7 +280,11 @@ export const ContagemEstoque: React.FC<ContagemEstoqueProps> = ({
           };
         },
       );
+
       setResultadoDivergencias(divergenciasCalculadas);
+    } catch (err: any) {
+      console.error("Erro ao processar inventário:", err);
+      alert("Erro ao processar o inventário. Tente novamente.");
     } finally {
       setEnviando(false);
     }

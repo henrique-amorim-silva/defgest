@@ -1,6 +1,7 @@
+// src/components/Navbar.tsx
 import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, Package, FilePlus, FileText, Database, ShieldAlert, Building2, Menu, X, Users } from 'lucide-react';
-import { apiRequest } from '../services/api';
+import { supabase } from '../services/api';
 
 interface NavbarProps {
   currentTab: string;
@@ -26,7 +27,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab, empre
     if (isAdminMaster) {
       const carregarEmpresasNavbar = async () => {
         try {
-          const data = await apiRequest("empresas");
+          const { data, error } = await supabase.from('empresas').select('*');
+          if (error) throw error;
           if (Array.isArray(data)) {
             setEmpresas(data);
           }

@@ -1,5 +1,6 @@
+// src/components/ConsultaAgrofit.tsx
 import React, { useState, useEffect } from "react";
-import { apiRequest } from "../services/api";
+import { supabase } from "../services/api";
 import {
   Database,
   RefreshCw,
@@ -123,28 +124,108 @@ export const ConsultaAgrofit: React.FC = () => {
     setCarregando(true);
     setErro(null);
     try {
-      const limiteParam = itensPorPagina === "todos" ? 10000 : itensPorPagina;
-      
-      const params = new URLSearchParams({
-        page: String(paginaAtual),
-        limit: String(limiteParam),
-        registro: filtrosAtuais.registro,
-        nomeComercial: filtrosAtuais.nomeComercial,
-        titularRegistro: filtrosAtuais.titularRegistro,
-        ingredienteAtivo: filtrosAtuais.ingredienteAtivo,
-        classeToxicologica: filtrosAtuais.classeToxicologica,
-        cultura: filtrosAtuais.cultura,
-        praga: filtrosAtuais.praga,
+      // Inicia a query no Supabase com join em instrucoes_uso
+      let query = supabase
+        .from('agrofit_produtos')
+        .select('*, instrucoes_uso(*)', { count: 'exact' });
+
+      // Aplicar filtros dinâmicos
+      if (filtrosAtuais.registro) {
+        query = query.ilike('numero_registro', `%${filtrosAtuais.registro}%`);
+      }
+      if (filtrosAtuais.nomeComercial) {
+        query = query.ilike('marca_comercial', `%${filtrosAtuais.nomeComercial}%`);
+      }
+      if (filtrosAtuais.titularRegistro) {
+        query = query.ilike('titular_registro', `%${filtrosAtuais.titularRegistro}%`);
+      }
+      if (filtrosAtuais.ingredienteAtivo) {
+        query = query.ilike('ingrediente_ativo', `%${filtrosAtuais.ingredienteAtivo}%`);
+      }
+      if (filtrosAtuais.classeToxicologica) {
+        query = query.ilike('classe_toxicologica', `%${filtrosAtuais.classeToxicologica}%`);
+      }
+
+      // Paginação
+      if (itensPorPagina !== "todos") {
+        const limitNum = Number(itensPorPagina);
+        const desde = (paginaAtual - 1) * limitNum;
+        const ate = desde + limitNum - 1;
+        query = query.range(desde, ate);
+      }
+
+      const { data, count, error } = await query;
+      if (error) throw error;
+
+      setTotalRegistros(count || 0);
+
+      // Mapear dados do banco para a interface do frontend
+      const produtosMapeados: ProdutoAgrofitCompleto[] = (data || []).map((item: any) => {
+        const indicacoesMapeadas: IndicacaoUso[] = Array.isArray(item.instrucoes_uso)
+          ? item.instrucoes_uso.map((ind: any) => ({
+              id: ind.id,
+              cultura: ind.cultura || "",
+              pragaNomeComum: ind.praga_nome_comum || "",
+              pragaNomeCientifico: ind.praga_nome_cientifico || "",
+              doseMin: String(ind.dose_min || ""),
+              doseMax: String(ind.dose_max || ""),
+              doseUnidade: ind.dose_unidade || "",
+              formaAplicacao: ind.modo_aplicacao || ind.forma_aplicacao || "",
+              volumeCaldaMin: String(ind.volume_calda_min || ""),
+              volumeCaldaMax: String(ind.volume_calda_max || ""),
+              volumeCaldaUnidade: ind.volume_calda_unidade || "",
+              nAplicacoes: String(ind.numero_aplicacoes || ind.n_aplicacoes || ""),
+              intReentrada: ind.int_reentrada || "",
+              intSeguranca: ind.intervalo_seguranca || ind.int_seguranca || "",
+              observacao: ind.observacao || "",
+            }))
+          : [];
+
+        // Filtrar no cliente caso tenha colocado filtro de cultura ou praga específica nas instruções
+        let passaFiltroCultura = true;
+        let passaFiltroPraga = true;
+
+        if (filtrosAtuais.cultura) {
+          passaFiltroCultura = indicacoesMapeadas.some(i => 
+            i.cultura.toLowerCase().includes(filtrosAtuais.cultura.toLowerCase())
+          );
+        }
+        if (filtrosAtuais.praga) {
+          passaFiltroPraga = indicacoesMapeadas.some(i => 
+            i.pragaNomeComum.toLowerCase().includes(filtrosAtuais.praga.toLowerCase())
+          );
+        }
+
+        return {
+          id: item.id,
+          registro: String(item.numero_registro || ""),
+          nomeComercial: item.marca_comercial || "",
+          titularRegistro: item.titular_registro || "",
+          ingredienteAtivo: item.ingrediente_ativo || "",
+          formulacao: item.formulacao || "",
+          grupoQuimico: item.grupo_quimico || "",
+          classeToxicologica: item.classe_toxicologica || "",
+          cultura: indicacoesMapeadas[0]?.cultura || "",
+          praga: indicacoesMapeadas[0]?.pragaNomeComum || "",
+          unidadePadrao: "Litros (L)",
+          updatedAt: item.updated_at,
+          documentosCadastrados: item.url_bula ? [{ tipo_documento: "Bula", url: item.url_bula }] : [],
+          indicacoesUso: indicacoesMapeadas,
+          _passaFiltrosTexto: passaFiltroCultura && passaFiltroPraga
+        };
       });
 
-      const endpoint = `agrofit/produtos?${params.toString()}`;
-      const dados = await apiRequest(endpoint, { signal });
-      setProdutos(dados.produtos || []);
-      setTotalRegistros(dados.total || 0);
+      // Se houver filtros de cultura ou praga aplicados, filtrar localmente o resultado do join
+      const filtradosFinais = produtosMapeados.filter((p: any) => p._passaFiltrosTexto);
+
+      setProdutos(filtradosFinais);
+      if (filtrosAtuais.cultura || filtrosAtuais.praga) {
+        setTotalRegistros(filtradosFinais.length);
+      }
 
       if (produtoModal) {
-        const atualizado = (dados.produtos || []).find(
-          (p: any) => p.registro === produtoModal.registro,
+        const atualizado = produtosMapeados.find(
+          (p) => p.registro === produtoModal.registro,
         );
         if (atualizado) setProdutoModal(atualizado);
       }
@@ -199,16 +280,12 @@ export const ConsultaAgrofit: React.FC = () => {
       formulacao: prod.formulacao || "",
       grupo_quimico: prod.grupoQuimico || "",
       classe_toxicologica: prod.classeToxicologica || "",
-      classe_categoria_agronomica:
-        (prod as any).classeCategoriaAgronomica || "",
+      classe_categoria_agronomica: (prod as any).classeCategoriaAgronomica || "",
       tecnica_aplicacao: (prod as any).tecnicaAplicacao || "",
       classificacao_ambiental: (prod as any).classificacaoAmbiental || "",
       unidade_medida: prod.unidadePadrao || "",
-      inflamavel:
-        (prod as any).inflamavel === true ||
-        (prod as any).inflamavel === "true",
-      corrosivo:
-        (prod as any).corrosivo === true || (prod as any).corrosivo === "true",
+      inflamavel: false,
+      corrosivo: false,
       url: prod.documentosCadastrados?.[0]?.url || "",
     });
     setModalFormAberto(true);
@@ -217,42 +294,34 @@ export const ConsultaAgrofit: React.FC = () => {
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      if (produtoEmEdicao) {
-        await apiRequest(`agrofit/produtos/${produtoEmEdicao.registro}`, {
-          method: "PUT",
-          body: JSON.stringify(formData),
-        });
+      const payload = {
+        numero_registro: formData.numero_registro,
+        marca_comercial: formData.marca_comercial,
+        titular_registro: formData.titular_registro,
+        ingrediente_ativo: formData.ingrediente_ativo,
+        formulacao: formData.formulacao,
+        grupo_quimico: formData.grupo_quimico,
+        classe_toxicologica: formData.classe_toxicologica,
+        url_bula: formData.url,
+      };
 
-        setProdutos((prev) =>
-          prev.map((p) =>
-            p.registro === produtoEmEdicao.registro
-              ? {
-                  ...p,
-                  nomeComercial: formData.marca_comercial,
-                  titularRegistro: formData.titular_registro,
-                  ingredienteAtivo: formData.ingrediente_ativo,
-                  formulacao: formData.formulacao,
-                  grupoQuimico: formData.grupo_quimico,
-                  classeToxicologica: formData.classe_toxicologica,
-                  classificacaoAmbiental: formData.classificacao_ambiental,
-                  classeCategoriaAgronomica:
-                    formData.classe_categoria_agronomica,
-                  unidadePadrao: formData.unidade_medida,
-                  documentosCadastrados: formData.url
-                    ? [{ tipo_documento: "Bula", url: formData.url }]
-                    : [],
-                }
-              : p,
-          ),
-        );
+      if (produtoEmEdicao) {
+        const { error } = await supabase
+          .from('agrofit_produtos')
+          .update(payload)
+          .eq('numero_registro', produtoEmEdicao.registro);
+
+        if (error) throw error;
       } else {
-        await apiRequest("agrofit/produtos", {
-          method: "POST",
-          body: JSON.stringify(formData),
-        });
-        carregarCatalogo(filtros);
+        const { error } = await supabase
+          .from('agrofit_produtos')
+          .insert([payload]);
+
+        if (error) throw error;
       }
+
       setModalFormAberto(false);
+      carregarCatalogo(filtros);
     } catch (err: any) {
       alert("Erro ao salvar: " + err.message);
     }
@@ -261,7 +330,12 @@ export const ConsultaAgrofit: React.FC = () => {
   const handleDelete = async (registro: string) => {
     if (!confirm(`Deseja realmente excluir o registro ${registro}?`)) return;
     try {
-      await apiRequest(`agrofit/produtos/${registro}`, { method: "DELETE" });
+      const { error } = await supabase
+        .from('agrofit_produtos')
+        .delete()
+        .eq('numero_registro', registro);
+
+      if (error) throw error;
       carregarCatalogo(filtros);
     } catch (err: any) {
       alert("Erro ao excluir: " + err.message);
@@ -314,20 +388,39 @@ export const ConsultaAgrofit: React.FC = () => {
     e.preventDefault();
     if (!produtoModal) return;
     try {
+      const payload = {
+        produto_registro: produtoModal.registro,
+        cultura: formInstrucao.cultura,
+        praga_nome_comum: formInstrucao.praga_nome_comum,
+        praga_nome_cientifico: formInstrucao.praga_nome_cientifico,
+        dose_min: formInstrucao.dose_min ? Number(formInstrucao.dose_min) : null,
+        dose_max: formInstrucao.dose_max ? Number(formInstrucao.dose_max) : null,
+        dose_unidade: formInstrucao.dose_unidade,
+        modo_aplicacao: formInstrucao.forma_aplicacao,
+        volume_calda_min: formInstrucao.volume_calda_min ? Number(formInstrucao.volume_calda_min) : null,
+        volume_calda_max: formInstrucao.volume_calda_max ? Number(formInstrucao.volume_calda_max) : null,
+        volume_calda_unidade: formInstrucao.volume_calda_unidade,
+        numero_aplicacoes: formInstrucao.n_aplicacoes,
+        int_reentrada: formInstrucao.int_reentrada,
+        intervalo_seguranca: formInstrucao.int_seguranca,
+        observacao: formInstrucao.observacao,
+      };
+
       if (instrucaoEmEdicao && instrucaoEmEdicao.id) {
-        await apiRequest(`agrofit/instrucoes/${instrucaoEmEdicao.id}`, {
-          method: "PUT",
-          body: JSON.stringify(formInstrucao),
-        });
+        const { error } = await supabase
+          .from('instrucoes_uso')
+          .update(payload)
+          .eq('id', instrucaoEmEdicao.id);
+
+        if (error) throw error;
       } else {
-        await apiRequest(
-          `agrofit/produtos/${produtoModal.registro}/instrucoes`,
-          {
-            method: "POST",
-            body: JSON.stringify(formInstrucao),
-          },
-        );
+        const { error } = await supabase
+          .from('instrucoes_uso')
+          .insert([payload]);
+
+        if (error) throw error;
       }
+
       setModalInstrucaoAberto(false);
       carregarCatalogo(filtros);
     } catch (err: any) {
@@ -338,7 +431,12 @@ export const ConsultaAgrofit: React.FC = () => {
   const handleExcluirInstrucao = async (id: number) => {
     if (!confirm("Deseja realmente excluir esta instrução de uso?")) return;
     try {
-      await apiRequest(`agrofit/instrucoes/${id}`, { method: "DELETE" });
+      const { error } = await supabase
+        .from('instrucoes_uso')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
       carregarCatalogo(filtros);
     } catch (err: any) {
       alert("Erro ao excluir instrução: " + err.message);
@@ -369,7 +467,7 @@ export const ConsultaAgrofit: React.FC = () => {
                 Catálogo Nacional - Agrofit (MAPA)
               </h2>
               <p className="text-sm text-gray-500">
-                Base completa sincronizada no banco de dados.
+                Base completa sincronizada no banco de dados do Supabase.
               </p>
             </div>
           </div>
@@ -393,7 +491,7 @@ export const ConsultaAgrofit: React.FC = () => {
           </div>
         </div>
 
-        {/* Filtros (Com o campo Titular entre Nome Comercial e Ingrediente Ativo - 7 colunas) */}
+        {/* Filtros */}
         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Registro</label>
@@ -502,7 +600,7 @@ export const ConsultaAgrofit: React.FC = () => {
 
         {carregando ? (
           <div className="text-center py-12 text-gray-500">
-            Carregando catálogo do banco de dados...
+            Carregando catálogo do Supabase...
           </div>
         ) : produtos.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
@@ -536,8 +634,8 @@ export const ConsultaAgrofit: React.FC = () => {
                     );
 
                     return (
-                      <tr key={p.registro} className="hover:bg-emerald-50/50 transition text">
-                        <td className="px-6 py-3 whitespace-nowrap text-xs font-mono font-medium text-emerald-800">
+                      <tr key={p.registro} className="hover:bg-emerald-50/50 transition">
+                        <td className="px-4 py-3 whitespace-nowrap text-xs font-mono font-medium text-emerald-800">
                           {p.registro}
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap text-xs font-bold text-gray-900 max-w-40 truncate" title={p.nomeComercial}>
@@ -1049,46 +1147,6 @@ export const ConsultaAgrofit: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Classe / Categoria Agronômica</label>
-                  <input
-                    type="text"
-                    value={formData.classe_categoria_agronomica}
-                    onChange={(e) => setFormData({ ...formData, classe_categoria_agronomica: e.target.value })}
-                    className="w-full px-3 py-2 border rounded text-sm"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Técnica de Aplicação</label>
-                  <input
-                    type="text"
-                    value={formData.tecnica_aplicacao}
-                    onChange={(e) => setFormData({ ...formData, tecnica_aplicacao: e.target.value })}
-                    className="w-full px-3 py-2 border rounded text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Classificação Ambiental</label>
-                  <input
-                    type="text"
-                    value={formData.classificacao_ambiental}
-                    onChange={(e) => setFormData({ ...formData, classificacao_ambiental: e.target.value })}
-                    className="w-full px-3 py-2 border rounded text-sm"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Unidade de Medida</label>
-                  <input
-                    type="text"
-                    value={formData.unidade_medida}
-                    onChange={(e) => setFormData({ ...formData, unidade_medida: e.target.value })}
-                    className="w-full px-3 py-2 border rounded text-sm"
-                  />
-                </div>
-                <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">URL da Bula</label>
                   <input
                     type="text"
@@ -1097,26 +1155,6 @@ export const ConsultaAgrofit: React.FC = () => {
                     className="w-full px-3 py-2 border rounded text-sm"
                   />
                 </div>
-              </div>
-              <div className="flex items-center space-x-6 pt-2">
-                <label className="flex items-center space-x-2 text-xs font-semibold text-gray-700 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.inflamavel}
-                    onChange={(e) => setFormData({ ...formData, inflamavel: e.target.checked })}
-                    className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
-                  />
-                  <span>Inflamável</span>
-                </label>
-                <label className="flex items-center space-x-2 text-xs font-semibold text-gray-700 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.corrosivo}
-                    onChange={(e) => setFormData({ ...formData, corrosivo: e.target.checked })}
-                    className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
-                  />
-                  <span>Corrosivo</span>
-                </label>
               </div>
 
               <div className="flex justify-end space-x-2 pt-4 border-t mt-4">

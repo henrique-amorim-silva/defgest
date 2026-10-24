@@ -1,6 +1,7 @@
+// src/components/Cadastros.tsx
 import React, { useState, useEffect } from 'react';
 import { Plus, Users, Truck, Edit, Trash2, X, MapPin } from 'lucide-react';
-import { apiRequest } from '../services/api';
+import { supabase } from '../services/api';
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -145,9 +146,15 @@ export default function Cadastros({ empresaId }: CadastrosProps) {
   const carregarDados = async () => {
     setLoading(true);
     try {
-      const query = empresaEfetiva ? `?empresa_id=${empresaEfetiva}` : '';
-      const endpoint = tipoAtivo === 'cliente' ? 'clientes' : 'fornecedores';
-      const data = await apiRequest(`${endpoint}${query}`);
+      const tabela = tipoAtivo === 'cliente' ? 'clientes' : 'fornecedores';
+      let query = supabase.from(tabela).select('*');
+      
+      if (empresaEfetiva) {
+        query = query.eq('empresa_id', empresaEfetiva);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
       
       if (Array.isArray(data)) {
         const formatados = data.map((item: any) => ({
@@ -314,7 +321,12 @@ export default function Cadastros({ empresaId }: CadastrosProps) {
 
     if (tipoAtivo === 'cliente') {
       try {
-        const props = await apiRequest(`clientes/${item.id}/propriedades`);
+        const { data: props, error } = await supabase
+          .from('propriedades')
+          .select('*')
+          .eq('cliente_id', item.id);
+
+        if (error) throw error;
         if (Array.isArray(props)) setPropriedadesLista(props);
       } catch (e) {
         setPropriedadesLista([]);
@@ -325,20 +337,18 @@ export default function Cadastros({ empresaId }: CadastrosProps) {
   const salvarRegistro = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const endpoint = tipoAtivo === 'cliente' ? 'clientes' : 'fornecedores';
+      const tabela = tipoAtivo === 'cliente' ? 'clientes' : 'fornecedores';
+      const empresaVal = empresaEfetiva ? Number(empresaEfetiva) : 1;
 
-      let payload: any = {
-        id: modoEdicao && idRegistroSelecionado ? idRegistroSelecionado : undefined,
-        empresaId: empresaEfetiva ? Number(empresaEfetiva) : 1,
-      };
+      let payload: any = {};
 
       if (tipoAtivo === 'cliente') {
         payload = {
-          ...payload,
+          empresa_id: empresaVal,
           nome,
-          cpfCnpj: cnpjCpf,
-          inscricaoEstadual,
-          registroGeral: rg,
+          cpf_cnpj: cnpjCpf,
+          inscricao_estadual: inscricaoEstadual,
+          registro_geral: rg,
           cep,
           endereco,
           bairro,
@@ -346,21 +356,20 @@ export default function Cadastros({ empresaId }: CadastrosProps) {
           numero,
           complemento,
           uf,
-          codigoIbge,
+          codigo_ibge: codigoIbge,
           telefone,
           celular,
           whatsapp,
           email,
-          status: 'Ativo',
-          propriedades: propriedadesLista
+          status: 'Ativo'
         };
       } else {
         payload = {
-          ...payload,
-          nomeFantasia: nome,
-          razaoSocial: razaoSocial || nome,
-          cnpjCpf,
-          inscricaoEstadual,
+          empresa_id: empresaVal,
+          nome_fantasia: nome,
+          razao_social: razaoSocial || nome,
+          cnpj_cpf: cnpjCpf,
+          inscricao_estadual: inscricaoEstadual,
           cep,
           endereco,
           cidade,
@@ -368,7 +377,7 @@ export default function Cadastros({ empresaId }: CadastrosProps) {
           numero,
           complemento,
           uf,
-          codigoIbge,
+          codigo_ibge: codigoIbge,
           email,
           telefone,
           celular,
@@ -376,10 +385,58 @@ export default function Cadastros({ empresaId }: CadastrosProps) {
         };
       }
 
-      await apiRequest(endpoint, {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
+      let clienteIdFinal = idRegistroSelecionado;
+
+      if (modoEdicao && idRegistroSelecionado) {
+        const { error: updateError } = await supabase
+          .from(tabela)
+          .update(payload)
+          .eq('id', idRegistroSelecionado);
+
+        if (updateError) throw updateError;
+      } else {
+        const { data: novoRegistro, error: insertError } = await supabase
+          .from(tabela)
+          .insert([payload])
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+        clienteIdFinal = novoRegistro.id;
+      }
+
+      // Se for cliente, salvar/atualizar as propriedades vinculadas
+      if (tipoAtivo === 'cliente' && clienteIdFinal) {
+        // Remove as propriedades antigas para substituir pelas da lista atualizada
+        await supabase.from('propriedades').delete().eq('cliente_id', clienteIdFinal);
+
+        if (propriedadesLista.length > 0) {
+          const propsFormatadas = propriedadesLista.map((p) => ({
+            cliente_id: clienteIdFinal,
+            nome_propriedade: p.nome_propriedade,
+            cpf_cnpj: p.cpf_cnpj,
+            lpr: p.lpr,
+            ie: p.ie,
+            area_ha: p.area_ha,
+            area_m2: p.area_m2,
+            cep: p.cep,
+            endereco: p.endereco,
+            bairro: p.bairro,
+            cidade: p.cidade,
+            numero: p.numero,
+            uf: p.uf,
+            codigo_ibge: p.codigo_ibge,
+            latitude: p.latitude,
+            longitude: p.longitude,
+            telefone: p.telefone,
+            whatsapp: p.whatsapp,
+            email: p.email
+          }));
+
+          const { error: propError } = await supabase.from('propriedades').insert(propsFormatadas);
+          if (propError) throw propError;
+        }
+      }
 
       setModalAberto(false);
       carregarDados();
@@ -392,8 +449,9 @@ export default function Cadastros({ empresaId }: CadastrosProps) {
   const excluirRegistro = async (id: number) => {
     if (!confirm('Deseja realmente excluir este registro?')) return;
     try {
-      const endpoint = tipoAtivo === 'cliente' ? 'clientes' : 'fornecedores';
-      await apiRequest(`${endpoint}/${id}`, { method: 'DELETE' });
+      const tabela = tipoAtivo === 'cliente' ? 'clientes' : 'fornecedores';
+      const { error } = await supabase.from(tabela).delete().eq('id', id);
+      if (error) throw error;
       carregarDados();
     } catch (err) {
       console.error('Erro ao excluir:', err);

@@ -1,5 +1,6 @@
+// src/components/GerenciamentoUsuarios.tsx
 import React, { useState, useEffect } from "react";
-import { apiRequest } from "../services/api";
+import { supabase } from "../services/api";
 import { Building2, Users, PlusCircle, CheckCircle, AlertCircle, Trash2, KeyRound } from "lucide-react";
 
 export function GerenciamentoUsuarios() {
@@ -21,10 +22,27 @@ export function GerenciamentoUsuarios() {
 
   const carregarDados = async () => {
     try {
-      const resEmpresas = await apiRequest("empresas");
-      setEmpresas(resEmpresas);
-      const resUsuarios = await apiRequest("usuarios");
-      setUsuarios(resUsuarios);
+      // 1. Busca empresas
+      const { data: resEmpresas, error: errEmp } = await supabase.from('empresas').select('*');
+      if (errEmp) throw errEmp;
+      setEmpresas(resEmpresas || []);
+
+      // 2. Busca usuários com o nome da empresa associada (Join)
+      const { data: resUsuarios, error: errUsu } = await supabase
+        .from('usuarios')
+        .select(`
+          *,
+          empresas:empresa_id (nome_fantasia)
+        `);
+
+      if (errUsu) throw errUsu;
+
+      const usuariosMapeados = (resUsuarios || []).map((u: any) => ({
+        ...u,
+        empresa_nome: u.empresas?.nome_fantasia || null
+      }));
+
+      setUsuarios(usuariosMapeados);
     } catch (err: any) {
       console.error("Erro ao carregar dados:", err);
     }
@@ -38,16 +56,18 @@ export function GerenciamentoUsuarios() {
     e.preventDefault();
     setMensagem(null);
     try {
-      await apiRequest("empresas", {
-        method: "POST",
-        body: JSON.stringify({ nome_fantasia: nomeFantasia, cnpj }),
-      });
+      const { error } = await supabase
+        .from('empresas')
+        .insert([{ nome_fantasia: nomeFantasia, cnpj }]);
+
+      if (error) throw error;
+
       setMensagem({ texto: "Empresa cadastrada com sucesso!", tipo: "sucesso" });
       setNomeFantasia("");
       setCnpj("");
       carregarDados();
     } catch (err: any) {
-      setMensagem({ texto: err.message, tipo: "erro" });
+      setMensagem({ texto: err.message || "Erro ao cadastrar empresa.", tipo: "erro" });
     }
   };
 
@@ -55,23 +75,25 @@ export function GerenciamentoUsuarios() {
     e.preventDefault();
     setMensagem(null);
     try {
-      await apiRequest("usuarios", {
-        method: "POST",
-        body: JSON.stringify({
-          empresa_id: empresaIdSelecionada || null,
+      const { error } = await supabase
+        .from('usuarios')
+        .insert([{
+          empresa_id: empresaIdSelecionada ? Number(empresaIdSelecionada) : null,
           nome: nomeUsuario,
           email: emailUsuario,
-          senha: senhaUsuario,
+          senha: senhaUsuario, // Nota: Se houver criptografia no backend, recomenda-se usar uma Edge Function. Aqui insere direto conforme estrutura da tabela.
           permissao: permissaoUsuario,
-        }),
-      });
+        }]);
+
+      if (error) throw error;
+
       setMensagem({ texto: "Usuário cadastrado com sucesso!", tipo: "sucesso" });
       setNomeUsuario("");
       setEmailUsuario("");
       setSenhaUsuario("");
       carregarDados();
     } catch (err: any) {
-      setMensagem({ texto: err.message, tipo: "erro" });
+      setMensagem({ texto: err.message || "Erro ao cadastrar usuário.", tipo: "erro" });
     }
   };
 
@@ -79,11 +101,17 @@ export function GerenciamentoUsuarios() {
     if (!window.confirm(`Tem certeza que deseja excluir o usuário "${nome}"?`)) return;
     setMensagem(null);
     try {
-      await apiRequest(`usuarios/${id}`, { method: "DELETE" });
+      const { error } = await supabase
+        .from('usuarios')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
       setMensagem({ texto: "Usuário excluído com sucesso!", tipo: "sucesso" });
       carregarDados();
     } catch (err: any) {
-      setMensagem({ texto: err.message, tipo: "erro" });
+      setMensagem({ texto: err.message || "Erro ao excluir usuário.", tipo: "erro" });
     }
   };
 
@@ -98,19 +126,22 @@ export function GerenciamentoUsuarios() {
 
     setMensagem(null);
     try {
-      await apiRequest(`usuarios/${id}/senha`, {
-        method: "PATCH",
-        body: JSON.stringify({ novaSenha }),
-      });
+      const { error } = await supabase
+        .from('usuarios')
+        .update({ senha: novaSenha })
+        .eq('id', id);
+
+      if (error) throw error;
+
       setMensagem({ texto: `Senha de ${nome} redefinida com sucesso!`, tipo: "sucesso" });
     } catch (err: any) {
-      setMensagem({ texto: err.message, tipo: "erro" });
+      setMensagem({ texto: err.message || "Erro ao redefinir senha.", tipo: "erro" });
     }
   };
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Painel do Administrador Master</h1>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">Painel do Administrador Master (Supabase)</h1>
 
       {mensagem && (
         <div className={`mb-6 p-4 rounded-lg text-sm flex items-center gap-2 ${
