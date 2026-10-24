@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../services/api";
 import { Building2, Users, PlusCircle, CheckCircle, AlertCircle, Trash2, KeyRound } from "lucide-react";
+import bcrypt from "bcryptjs"; // Importa o bcryptjs
 
 export function GerenciamentoUsuarios() {
   const [empresas, setEmpresas] = useState<any[]>([]);
@@ -22,12 +23,10 @@ export function GerenciamentoUsuarios() {
 
   const carregarDados = async () => {
     try {
-      // 1. Busca empresas
       const { data: resEmpresas, error: errEmp } = await supabase.from('empresas').select('*');
       if (errEmp) throw errEmp;
       setEmpresas(resEmpresas || []);
 
-      // 2. Busca usuários com o nome da empresa associada (Join)
       const { data: resUsuarios, error: errUsu } = await supabase
         .from('usuarios')
         .select(`
@@ -75,13 +74,17 @@ export function GerenciamentoUsuarios() {
     e.preventDefault();
     setMensagem(null);
     try {
+      // Gera o hash seguro da senha antes de inserir
+      const salt = bcrypt.genSaltSync(10);
+      const senhaHash = bcrypt.hashSync(senhaUsuario, salt);
+
       const { error } = await supabase
         .from('usuarios')
         .insert([{
           empresa_id: empresaIdSelecionada ? Number(empresaIdSelecionada) : null,
           nome: nomeUsuario,
           email: emailUsuario,
-          senha: senhaUsuario, // Nota: Se houver criptografia no backend, recomenda-se usar uma Edge Function. Aqui insere direto conforme estrutura da tabela.
+          senha_hash: senhaHash, // Salva o hash criptografado
           permissao: permissaoUsuario,
         }]);
 
@@ -126,9 +129,13 @@ export function GerenciamentoUsuarios() {
 
     setMensagem(null);
     try {
+      // Gera o hash seguro para a nova senha
+      const salt = bcrypt.genSaltSync(10);
+      const senhaHash = bcrypt.hashSync(novaSenha, salt);
+
       const { error } = await supabase
         .from('usuarios')
-        .update({ senha: novaSenha })
+        .update({ senha_hash: senhaHash })
         .eq('id', id);
 
       if (error) throw error;

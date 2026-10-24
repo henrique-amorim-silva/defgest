@@ -1,5 +1,7 @@
+// src/components/Login.tsx
 import React, { useState } from "react";
 import { Lock, Mail, AlertCircle } from "lucide-react";
+import { supabase } from "../services/api";
 
 const logoSrc = `${import.meta.env.BASE_URL}images/nav-logo.png`;
 
@@ -19,32 +21,37 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     setCarregando(true);
 
     try {
-      // Usa a URL configurada no ambiente (ex: Ngrok) ou cai para localhost se não houver
-      const apiUrl =
-        import.meta.env.VITE_API_URL || "http://localhost:3001/api";
+      // Consulta direta à tabela 'usuarios' no Supabase
+      const { data: usuarios, error } = await supabase
+        .from("usuarios")
+        .select("*")
+        .eq("email", email)
+        .limit(1);
 
-      const response = await fetch(`${apiUrl}/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, senha }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.erro || "Erro ao realizar login.");
+      if (error) {
+        throw new Error(error.message || "Erro ao consultar o banco de dados.");
       }
 
-      // Salva o token JWT e os dados do usuário no localStorage
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("usuario", JSON.stringify(data.usuario));
+      if (!usuarios || usuarios.length === 0) {
+        throw new Error("E-mail não encontrado.");
+      }
 
-      // Notifica o componente principal que o login ocorreu com sucesso
+      const usuarioEncontrado = usuarios[0];
+
+      // Validação utilizando a coluna correta 'senha_hash'
+      const senhaArmazenada = usuarioEncontrado.senha_hash;
+      if (senhaArmazenada !== senha) {
+        throw new Error("Senha incorreta.");
+      }
+
+      // Armazena a sessão e os dados do usuário no localStorage
+      localStorage.setItem("token", "supabase-session-token");
+      localStorage.setItem("usuario", JSON.stringify(usuarioEncontrado));
+
+      // Notifica o componente principal que o login foi bem-sucedido
       onLoginSuccess();
     } catch (err: any) {
-      setErro(err.message || "Erro de conexão com o servidor.");
+      setErro(err.message || "Erro ao realizar login.");
     } finally {
       setCarregando(false);
     }
@@ -54,8 +61,6 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-8 border border-gray-200">
         <div className="text-center mb-8">
-          {/* Se a logo estiver na pasta public, basta usar src="/sua-logo.png" */}
-          {/* Se estiver em src/assets, importe-a no topo do arquivo */}
           <div className="flex justify-center mb-4">
             <img
               src={logoSrc}

@@ -124,12 +124,10 @@ export const ConsultaAgrofit: React.FC = () => {
     setCarregando(true);
     setErro(null);
     try {
-      // Inicia a query no Supabase com join em instrucoes_uso
       let query = supabase
         .from('agrofit_produtos')
         .select('*, instrucoes_uso(*)', { count: 'exact' });
 
-      // Aplicar filtros dinâmicos
       if (filtrosAtuais.registro) {
         query = query.ilike('numero_registro', `%${filtrosAtuais.registro}%`);
       }
@@ -143,10 +141,9 @@ export const ConsultaAgrofit: React.FC = () => {
         query = query.ilike('ingrediente_ativo', `%${filtrosAtuais.ingredienteAtivo}%`);
       }
       if (filtrosAtuais.classeToxicologica) {
-        query = query.ilike('classe_toxicologica', `%${filtrosAtuais.classeToxicologica}%`);
+        query = query.ilike('classificacao_toxicologica', `%${filtrosAtuais.classeToxicologica}%`);
       }
 
-      // Paginação
       if (itensPorPagina !== "todos") {
         const limitNum = Number(itensPorPagina);
         const desde = (paginaAtual - 1) * limitNum;
@@ -159,7 +156,6 @@ export const ConsultaAgrofit: React.FC = () => {
 
       setTotalRegistros(count || 0);
 
-      // Mapear dados do banco para a interface do frontend
       const produtosMapeados: ProdutoAgrofitCompleto[] = (data || []).map((item: any) => {
         const indicacoesMapeadas: IndicacaoUso[] = Array.isArray(item.instrucoes_uso)
           ? item.instrucoes_uso.map((ind: any) => ({
@@ -181,7 +177,6 @@ export const ConsultaAgrofit: React.FC = () => {
             }))
           : [];
 
-        // Filtrar no cliente caso tenha colocado filtro de cultura ou praga específica nas instruções
         let passaFiltroCultura = true;
         let passaFiltroPraga = true;
 
@@ -204,18 +199,17 @@ export const ConsultaAgrofit: React.FC = () => {
           ingredienteAtivo: item.ingrediente_ativo || "",
           formulacao: item.formulacao || "",
           grupoQuimico: item.grupo_quimico || "",
-          classeToxicologica: item.classe_toxicologica || "",
+          classeToxicologica: item.classificacao_toxicologica || "",
           cultura: indicacoesMapeadas[0]?.cultura || "",
           praga: indicacoesMapeadas[0]?.pragaNomeComum || "",
-          unidadePadrao: "Litros (L)",
+          unidadePadrao: item.unidade_medida || "Litros (L)",
           updatedAt: item.updated_at,
-          documentosCadastrados: item.url_bula ? [{ tipo_documento: "Bula", url: item.url_bula }] : [],
+          documentosCadastrados: item.url ? [{ tipo_documento: "Bula", url: item.url }] : [],
           indicacoesUso: indicacoesMapeadas,
           _passaFiltrosTexto: passaFiltroCultura && passaFiltroPraga
         };
       });
 
-      // Se houver filtros de cultura ou praga aplicados, filtrar localmente o resultado do join
       const filtradosFinais = produtosMapeados.filter((p: any) => p._passaFiltrosTexto);
 
       setProdutos(filtradosFinais);
@@ -301,8 +295,8 @@ export const ConsultaAgrofit: React.FC = () => {
         ingrediente_ativo: formData.ingrediente_ativo,
         formulacao: formData.formulacao,
         grupo_quimico: formData.grupo_quimico,
-        classe_toxicologica: formData.classe_toxicologica,
-        url_bula: formData.url,
+        classificacao_toxicologica: formData.classe_toxicologica,
+        url: formData.url,
       };
 
       if (produtoEmEdicao) {
@@ -653,7 +647,7 @@ export const ConsultaAgrofit: React.FC = () => {
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap text-xs">
                           <span className="px-2 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-900 rounded-full border border-amber-200 inline-block truncate max-w-30" title={p.classeToxicologica}>
-                            {p.classeToxicologica}
+                            {p.classeToxicologica || "-"}
                           </span>
                         </td>
                         <td className="px-3 py-3 text-xs text-gray-600 whitespace-nowrap">
