@@ -1,31 +1,61 @@
-// receita.ts
+// src/@types/receita.ts
+
+export interface ItemReceitaAgronomica {
+  produtoId: string;
+  nomeProduto: string;
+  ingredienteAtivo?: string;
+  classeToxicologica?: string;
+  grupoQuimico?: string;
+  formulacao?: string;
+  concentracao?: string;
+  cultura: string;
+  pragaNomeComum: string;
+  pragaNomeCientifico: string;
+  modoAplicacao: string;
+  epocaAplicacao?: string;
+  dosagemMin: number;
+  dosagemMax: number;
+  dosagemUtilizada: number;
+  unidadeDosagem: string;
+  volumeCaldaMin: number;
+  volumeCaldaMax: number;
+  volumeCaldaUtilizado: number;
+  unidadeVolumeCalda: string;
+  areaAplicacaoHectares: number;
+  quantidadeRecomendada: number;
+  numeroAplicacoesMax?: string | number;
+  intervaloSeguranca?: string;
+  carenciaDias?: string | number;
+  embalagemDescricao?: string;
+}
 
 export interface ReceitaAgronomica {
   id: string;
   numeroReceita: string;
+  
+  // Dados do Produtor / Cliente
   produtorNome: string;
   produtorCpfCnpj: string;
+  produtorRgIe?: string;
+  produtorEndereco?: string;
+  produtorMunicipio?: string;
+  produtorTelefone?: string;
+
+  // Dados da Propriedade
   propriedadeNome: string;
-  itens: {
-    produtoId: string;
-    nomeProduto: string;
-    cultura: string;
-    pragaNomeComum: string;
-    pragaNomeCientifico: string;
-    modoAplicacao: string;
-    dosagemMin: number;
-    dosagemMax: number;
-    dosagemUtilizada: number; // Editável pelo vendedor
-    unidadeDosagem: string;
-    volumeCaldaMin: number;
-    volumeCaldaMax: number;
-    volumeCaldaUtilizado: number; // Editável pelo vendedor
-    unidadeVolumeCalda: string;
-    areaAplicacaoHectares: number;
-    quantidadeRecomendada: number; // Calculada: dosagemUtilizada * area
-    numeroAplicacoesMax?: string | number; // Adicionado para o nº máximo de aplicações
-    intervaloSeguranca?: string;          // Adicionado para o intervalo de segurança/carência
-  }[];
+  propriedadeCpfCnpj?: string;
+  propriedadeIpr?: string;
+  propriedadeEndereco?: string;
+  propriedadeMunicipio?: string;
+  propriedadeAreaTotalHa?: number;
+
+  // Responsável Técnico
+  respTecNome?: string;
+  respTecCpfCrea?: string;
+  respTecLocal?: string;
+  artTrtNumero?: string;
+
+  itens: ItemReceitaAgronomica[];
   orientacoes: string;
   dataEmissao: string;
 }
