@@ -1,7 +1,6 @@
 // src/services/estoqueApi.ts
 import { supabase } from './api';
 
-// Representa um Lote específico do produto na tabela `lote_validade`
 export interface LoteEstoque {
   id: number;
   lote: string;
@@ -11,7 +10,6 @@ export interface LoteEstoque {
   dataEntrada?: string;
 }
 
-// Representa o Produto no Estoque, que agrupa os seus lotes
 export interface ItemEstoque {
   id: number;
   empresaId?: number;
@@ -83,8 +81,6 @@ export async function excluirItemEstoque(id: number): Promise<void> {
 
   if (error) throw error;
 }
-
-// --- HISTÓRICO DE NOTAS FISCAIS ---
 
 export interface ItemNotaHistorico {
   id: number;
@@ -163,9 +159,11 @@ export async function salvarNotaFiscalCompleta(dados: {
   fornecedorId?: number | null;
   itens: any[];
   notaEmEdicaoId?: string | null;
+  empresaId?: string | number;
 }): Promise<any> {
-  const { numeroNota, dataEntrada, fornecedorId, itens, notaEmEdicaoId } = dados;
+  const { numeroNota, dataEntrada, fornecedorId, itens, notaEmEdicaoId, empresaId } = dados;
   let nfId = notaEmEdicaoId;
+  const empresaIdVal = empresaId ? Number(empresaId) : 1;
 
   if (notaEmEdicaoId) {
     const { error: updateError } = await supabase
@@ -187,6 +185,7 @@ export async function salvarNotaFiscalCompleta(dados: {
         numero_nota: numeroNota,
         data_entrada: dataEntrada,
         fornecedor_id: fornecedorId,
+        empresa_id: empresaIdVal,
       }])
       .select()
       .single();
@@ -196,16 +195,69 @@ export async function salvarNotaFiscalCompleta(dados: {
   }
 
   if (itens && itens.length > 0 && nfId) {
-    const itensFormatados = itens.map((item: any) => ({
-      nota_fiscal_id: nfId,
-      estoque_id: item.estoqueId || item.estoque_id,
-      nome_produto: item.nomeProduto || item.nome_produto,
-      lote: item.lote,
-      quantidade: item.quantidade,
-      unidade: item.unidade,
-      embalagem: item.embalagem,
-      data_validade: item.dataValidade || item.data_validade,
-    }));
+    const itensFormatados = [];
+
+    for (const item of itens) {
+      const nomeProd = item.produto?.nomeComercial || item.nomeProduto || item.nome_produto || "Produto";
+      const unidadeProd = item.unidade || "L";
+      const embalagemProd = item.embalagem || "";
+      const estMinProd = item.estMin ? Number(item.estMin) : 0;
+
+      // 1. Verificar se o produto já existe no estoque da empresa
+      let estoqueIdFinal = null;
+      const { data: estoqueExistente } = await supabase
+        .from('estoque')
+        .select('id')
+        .eq('empresa_id', empresaIdVal)
+        .ilike('nome_produto', nomeProd)
+        .maybeSingle();
+
+      if (estoqueExistente) {
+        estoqueIdFinal = estoqueExistente.id;
+      } else {
+        // Se não existir, cadastra automaticamente no estoque
+        const { data: novoEstoque, error: errEstoque } = await supabase
+          .from('estoque')
+          .insert([{
+            empresa_id: empresaIdVal,
+            nome_produto: nomeProd,
+            unidade: unidadeProd,
+            embalagem: embalagemProd,
+            est_min: estMinProd
+          }])
+          .select()
+          .single();
+
+        if (errEstoque) throw errEstoque;
+        estoqueIdFinal = novoEstoque.id;
+      }
+
+      // 2. Inserir lote na tabela `lote_validade` para alimentar o estoque físico
+      if (item.lote && estoqueIdFinal) {
+        await supabase
+          .from('lote_validade')
+          .insert([{
+            estoque_id: estoqueIdFinal,
+            empresa_id: empresaIdVal,
+            lote: item.lote,
+            quantidade_atual: Number(item.quantidade),
+            data_validade: item.dataValidade || item.data_validade,
+            numero_nota_fiscal: numeroNota,
+            data_entrada: dataEntrada
+          }]);
+      }
+
+      itensFormatados.push({
+        nota_fiscal_id: nfId,
+        estoque_id: estoqueIdFinal,
+        nome_produto: nomeProd,
+        lote: item.lote,
+        quantidade: Number(item.quantidade),
+        unidade: unidadeProd,
+        embalagem: embalagemProd,
+        data_validade: item.dataValidade || item.data_validade,
+      });
+    }
 
     const { error: itensError } = await supabase
       .from('itens_nota_fiscal')

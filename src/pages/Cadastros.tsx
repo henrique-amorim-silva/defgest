@@ -25,11 +25,12 @@ interface CadastrosProps {
 interface ClienteFornecedor {
   id: number;
   nome: string;
+  razao_social?:string;
   cnpj_cpf: string;
   tipo: 'cliente' | 'fornecedor';
   telefone?: string;
-  celular?: string;
   whatsapp?: string;
+  celular?: string;
   email?: string;
   inscricao_estadual?: string;
   registro_geral?: string;
@@ -110,7 +111,6 @@ export default function Cadastros({ empresaId }: CadastrosProps) {
   // Contatos Gerais
   const [email, setEmail] = useState('');
   const [telefone, setTelefone] = useState('');
-  const [celular, setCelular] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
 
   // Campos da Aba Propriedades
@@ -161,7 +161,8 @@ export default function Cadastros({ empresaId }: CadastrosProps) {
           ...item,
           tipo: tipoAtivo,
           nome: tipoAtivo === 'cliente' ? item.nome : item.nome_fantasia,
-          cnpj_cpf: tipoAtivo === 'cliente' ? item.cpf_cnpj : item.cnpj_cpf
+          cnpj_cpf: tipoAtivo === 'cliente' ? item.cpf_cnpj : item.cnpj_cpf,
+          whatsapp: tipoAtivo === 'cliente' ? item.whatsapp : item.celular
         }));
         setLista(formatados);
       }
@@ -291,7 +292,6 @@ export default function Cadastros({ empresaId }: CadastrosProps) {
     setCodigoIbge('');
     setEmail('');
     setTelefone('');
-    setCelular('');
     setWhatsapp('');
     setPropriedadesLista([]);
     setModalAberto(true);
@@ -302,6 +302,7 @@ export default function Cadastros({ empresaId }: CadastrosProps) {
     setIdRegistroSelecionado(item.id);
     setAbaCliente('geral');
     setNome(item.nome || '');
+    setRazaoSocial(item.razao_social || '');
     setCnpjCpf(item.cnpj_cpf || '');
     setInscricaoEstadual(item.inscricao_estadual || '');
     setRg(item.registro_geral || '');
@@ -315,7 +316,6 @@ export default function Cadastros({ empresaId }: CadastrosProps) {
     setCodigoIbge(item.codigo_ibge || '');
     setEmail(item.email || '');
     setTelefone(item.telefone || '');
-    setCelular(item.celular || '');
     setWhatsapp(item.whatsapp || '');
     setModalAberto(true);
 
@@ -358,7 +358,6 @@ export default function Cadastros({ empresaId }: CadastrosProps) {
           uf,
           codigo_ibge: codigoIbge,
           telefone,
-          celular,
           whatsapp,
           email,
           status: 'Ativo'
@@ -375,13 +374,11 @@ export default function Cadastros({ empresaId }: CadastrosProps) {
           cidade,
           bairro,
           numero,
-          complemento,
           uf,
           codigo_ibge: codigoIbge,
           email,
           telefone,
-          celular,
-          whatsapp
+          celular: whatsapp // Mapeia para a coluna 'celular' na tabela fornecedores
         };
       }
 
@@ -407,7 +404,6 @@ export default function Cadastros({ empresaId }: CadastrosProps) {
 
       // Se for cliente, salvar/atualizar as propriedades vinculadas
       if (tipoAtivo === 'cliente' && clienteIdFinal) {
-        // Remove as propriedades antigas para substituir pelas da lista atualizada
         await supabase.from('propriedades').delete().eq('cliente_id', clienteIdFinal);
 
         if (propriedadesLista.length > 0) {
@@ -555,7 +551,7 @@ export default function Cadastros({ empresaId }: CadastrosProps) {
             <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase tracking-wider">
               <th className="py-3 px-6">Nome / Razão Social</th>
               <th className="py-3 px-6">CNPJ / CPF</th>
-              <th className="py-3 px-6">Telefone / Celular</th>
+              <th className="py-3 px-6">Telefone / WhatsApp</th>
               <th className="py-3 px-6">E-mail</th>
               <th className="py-3 px-6 text-right">Ações</th>
             </tr>
@@ -563,7 +559,7 @@ export default function Cadastros({ empresaId }: CadastrosProps) {
           <tbody className="divide-y divide-gray-200 text-sm text-gray-700">
             {loading ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-gray-500">Carregando dados...</td>
+                <td colSpan={5} className="py-8 text-center text-gray-500">A carregar dados...</td>
               </tr>
             ) : lista.length === 0 ? (
               <tr>
@@ -574,7 +570,7 @@ export default function Cadastros({ empresaId }: CadastrosProps) {
                 <tr key={item.id} className="hover:bg-gray-50/50">
                   <td className="py-3.5 px-6 font-medium text-gray-900">{item.nome}</td>
                   <td className="py-3.5 px-6">{item.cnpj_cpf}</td>
-                  <td className="py-3.5 px-6">{item.celular || item.telefone || '-'}</td>
+                  <td className="py-3.5 px-6">{item.whatsapp || item.telefone || '-'}</td>
                   <td className="py-3.5 px-6">{item.email || '-'}</td>
                   <td className="py-3.5 px-6 text-right space-x-2">
                     <button onClick={() => abrirModalEdicao(item)} className="text-blue-600 hover:text-blue-800 p-1 rounded" title="Editar">
@@ -752,15 +748,17 @@ export default function Cadastros({ empresaId }: CadastrosProps) {
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                         />
                       </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">Complemento</label>
-                        <input
-                          type="text"
-                          value={complemento}
-                          onChange={(e) => setComplemento(e.target.value)}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                        />
-                      </div>
+                      {tipoAtivo === 'cliente' && (
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">Complemento</label>
+                          <input
+                            type="text"
+                            value={complemento}
+                            onChange={(e) => setComplemento(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                          />
+                        </div>
+                      )}
                       <div>
                         <label className="block text-xs font-semibold text-gray-700 mb-1">UF *</label>
                         <input

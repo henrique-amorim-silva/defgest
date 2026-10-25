@@ -13,6 +13,15 @@ import {
   Printer,
 } from "lucide-react";
 
+interface LoteValidade {
+  id?: number;
+  lote?: string;
+  numero_lote?: string;
+  quantidade_atual?: number;
+  quantidade?: number;
+  saldo?: number;
+}
+
 interface ProdutoInventario {
   id: number;
   nomeProduto?: string;
@@ -25,6 +34,7 @@ interface ProdutoInventario {
   quantidade?: number;
   saldo?: number;
   qtdSistema?: number;
+  lote_validade?: LoteValidade[];
 }
 
 interface ItemContadoLinha {
@@ -36,6 +46,8 @@ interface ItemContadoLinha {
 
 interface Divergencia {
   estoqueId: number;
+  produtoNome: string;
+  embalagemStr: string;
   lote: string;
   qtdSistema: number;
   qtdContada: number;
@@ -77,6 +89,8 @@ export const ContagemEstoque: React.FC<ContagemEstoqueProps> = ({
   const carregarDadosIniciais = async () => {
     setCarregando(true);
     try {
+      const empresaIdVal = empresaSelecionada ? Number(empresaSelecionada) : 1;
+
       if (empresaSelecionada) {
         if (isAdminMaster) {
           const { data: empresasData } = await supabase.from('empresas').select('*');
@@ -101,7 +115,6 @@ export const ContagemEstoque: React.FC<ContagemEstoqueProps> = ({
         );
       }
 
-      // Buscar produtos do estoque com suporte a filtro de empresa
       let queryEstoque = supabase.from('estoque').select('*, lote_validade(*)');
       if (empresaSelecionada) {
         queryEstoque = queryEstoque.eq('empresa_id', empresaSelecionada);
@@ -118,28 +131,32 @@ export const ContagemEstoque: React.FC<ContagemEstoqueProps> = ({
       if (Array.isArray(data)) {
         setProdutos(data);
 
-        // Tentar carregar rascunho salvo no Supabase (tabela contagem_temporaria ou equivalente)
         try {
-          let queryRascunho = supabase.from('contagem_temporaria').select('*');
-          if (empresaSelecionada) {
-            queryRascunho = queryRascunho.eq('empresa_id', empresaSelecionada);
-          }
-          const { data: rascunhoRes } = await queryRascunho.maybeSingle();
+          const { data: rascunhoRes, error: errRascunho } = await supabase
+            .from('contagem_temporaria')
+            .select('*')
+            .eq('empresa_id', empresaIdVal)
+            .maybeSingle();
 
-          if (
-            rascunhoRes &&
-            Array.isArray(rascunhoRes.itens) &&
-            rascunhoRes.itens.length > 0
-          ) {
-            setLinhasContagem(rascunhoRes.itens);
-            setCarregando(false);
-            return;
+          if (!errRascunho && rascunhoRes && rascunhoRes.itens_json) {
+            let itensParseados = rascunhoRes.itens_json;
+            if (typeof itensParseados === "string") {
+              try {
+                itensParseados = JSON.parse(itensParseados);
+              } catch (e) {
+                itensParseados = [];
+              }
+            }
+            if (Array.isArray(itensParseados) && itensParseados.length > 0) {
+              setLinhasContagem(itensParseados);
+              setCarregando(false);
+              return;
+            }
           }
         } catch (e) {
-          console.error("Erro ao carregar rascunho do servidor:", e);
+          console.error("Aviso ao carregar rascunho:", e);
         }
 
-        // Se não houver rascunho, inicia linhas vazias para cada produto
         const linhasIniciais: ItemContadoLinha[] = data.map(
           (prod: ProdutoInventario) => ({
             idUnico: `${prod.id}-${Date.now()}-${Math.random()}`,
@@ -165,13 +182,18 @@ export const ContagemEstoque: React.FC<ContagemEstoqueProps> = ({
   const salvarRascunhoNoServidor = async (novasLinhas: ItemContadoLinha[]) => {
     try {
       const empresaIdVal = empresaSelecionada ? Number(empresaSelecionada) : 1;
-      
-      // Upsert do rascunho na tabela contagem_temporaria do Supabase
-      await supabase.from('contagem_temporaria').upsert({
-        empresa_id: empresaIdVal,
-        itens: novasLinhas,
-        atualizado_em: new Date().toISOString()
-      }, { onConflict: 'empresa_id' });
+      const itensStringify = JSON.stringify(novasLinhas);
+
+      await supabase
+        .from('contagem_temporaria')
+        .upsert(
+          {
+            empresa_id: empresaIdVal,
+            itens_json: itensStringify,
+            atualizado_em: new Date().toISOString()
+          },
+          { onConflict: 'empresa_id' }
+        );
     } catch (err) {
       console.error("Erro ao sincronizar rascunho:", err);
     }
@@ -186,6 +208,12 @@ export const ContagemEstoque: React.FC<ContagemEstoqueProps> = ({
       prod.descricao ||
       `Produto ID: ${prod.id}`
     );
+  };
+
+  const getEmbalagemTexto = (prod: ProdutoInventario) => {
+    const unidade = prod.unidade || "";
+    const embalagem = prod.embalagem ? `(${prod.embalagem})` : "";
+    return `${unidade} ${embalagem}`.trim() || "-";
   };
 
   const handleLinhaChange = (
@@ -229,20 +257,6 @@ export const ContagemEstoque: React.FC<ContagemEstoqueProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const itensContados = linhasContagem
-      .filter(
-        (item) => item.lote.trim() !== "" || item.quantidadeContada !== "",
-      )
-      .map((item) => ({
-        estoqueId: item.estoqueId,
-        lote: item.lote,
-        quantidadeContada: item.quantidadeContada,
-      }));
-
-    if (itensContados.length === 0) {
-      alert("Preencha ao menos um lote e quantidade antes de finalizar.");
-      return;
-    }
 
     if (
       !confirm(
@@ -253,33 +267,91 @@ export const ContagemEstoque: React.FC<ContagemEstoqueProps> = ({
 
     setEnviando(true);
     try {
-      const empresaIdVal = empresaSelecionada ? Number(empresaSelecionada) : null;
+      const empresaIdVal = empresaSelecionada ? Number(empresaSelecionada) : 1;
 
-      // Apagar o rascunho do banco após finalizar
-      let deleteQuery = supabase.from('contagem_temporaria').delete();
-      if (empresaIdVal) {
-        deleteQuery = deleteQuery.eq('empresa_id', empresaIdVal);
+      const { error: deleteError } = await supabase
+        .from('contagem_temporaria')
+        .delete()
+        .eq('empresa_id', empresaIdVal);
+
+      if (deleteError) {
+        console.error("Erro ao limpar dados temporários:", deleteError);
       }
-      await deleteQuery;
 
-      // Calcular divergências comparando com o estoque atual carregado
-      const divergenciasCalculadas: Divergencia[] = itensContados.map(
-        (item) => {
-          const prod = produtos.find((p) => p.id === item.estoqueId);
-          const qtdSistema = Number(
-            prod?.quantidade ?? prod?.saldo ?? prod?.qtdSistema ?? 0,
-          );
-          const qtdContada = Number(item.quantidadeContada || 0);
-          const diferenca = qtdContada - qtdSistema;
-          return {
-            estoqueId: item.estoqueId,
-            lote: item.lote,
-            qtdSistema,
-            qtdContada,
-            diferenca,
-          };
-        },
-      );
+      // 1. Mapear o que foi preenchido pelo utilizador
+      const mapaContados = new Map<string, number>(); // Chave: "estoqueId_lote" -> quantidade contada
+      
+      linhasContagem.forEach((item) => {
+        if (item.lote.trim() !== "" && item.quantidadeContada !== "") {
+          const chave = `${item.estoqueId}_${item.lote.trim().toLowerCase()}`;
+          mapaContados.set(chave, Number(item.quantidadeContada));
+        }
+      });
+
+      const divergenciasCalculadas: Divergencia[] = [];
+
+      // 2. Percorrer todos os produtos e todos os lotes existentes no sistema
+      produtos.forEach((prod) => {
+        const produtoNome = getNomeProduto(prod);
+        const embalagemStr = getEmbalagemTexto(prod);
+
+        if (Array.isArray(prod.lote_validade) && prod.lote_validade.length > 0) {
+          prod.lote_validade.forEach((loteObj) => {
+            const numeroLote = String(loteObj.lote || loteObj.numero_lote || "").trim();
+            const qtdSistema = Number(
+              loteObj.quantidade_atual ??
+              loteObj.quantidade ??
+              loteObj.saldo ??
+              0
+            );
+
+            if (numeroLote) {
+              const chave = `${prod.id}_${numeroLote.toLowerCase()}`;
+              const foiContado = mapaContados.has(chave);
+              const qtdContada = foiContado ? mapaContados.get(chave)! : 0;
+
+              // Inclui no relatório se foi contado OU se tem quantidade no sistema > 0 (mesmo não contado)
+              if (foiContado || qtdSistema > 0) {
+                const diferenca = qtdContada - qtdSistema;
+                divergenciasCalculadas.push({
+                  estoqueId: prod.id,
+                  produtoNome,
+                  embalagemStr,
+                  lote: numeroLote,
+                  qtdSistema,
+                  qtdContada,
+                  diferenca,
+                });
+                // Remove do mapa para sabermos quais sobraram
+                mapaContados.delete(chave);
+              }
+            }
+          });
+        }
+      });
+
+      // 3. Adicionar lotes contados extra que não estavam cadastrados no sistema (se houver)
+      linhasContagem.forEach((item) => {
+        if (item.lote.trim() !== "" && item.quantidadeContada !== "") {
+          const chave = `${item.estoqueId}_${item.lote.trim().toLowerCase()}`;
+          if (mapaContados.has(chave)) {
+            const prod = produtos.find((p) => p.id === item.estoqueId);
+            const produtoNome = prod ? getNomeProduto(prod) : `ID: ${item.estoqueId}`;
+            const embalagemStr = prod ? getEmbalagemTexto(prod) : "-";
+            const qtdContada = Number(item.quantidadeContada);
+            
+            divergenciasCalculadas.push({
+              estoqueId: item.estoqueId,
+              produtoNome,
+              embalagemStr,
+              lote: item.lote.trim(),
+              qtdSistema: 0,
+              qtdContada,
+              diferenca: qtdContada,
+            });
+          }
+        }
+      });
 
       setResultadoDivergencias(divergenciasCalculadas);
     } catch (err: any) {
@@ -335,6 +407,7 @@ export const ContagemEstoque: React.FC<ContagemEstoqueProps> = ({
               <thead>
                 <tr className="bg-gray-50 text-gray-700 uppercase tracking-wider border-b border-gray-200 print:bg-gray-200 print:text-black">
                   <th className="py-2.5 px-3">Produto</th>
+                  <th className="py-2.5 px-3">Embalagem</th>
                   <th className="py-2.5 px-3">Lote</th>
                   <th className="py-2.5 px-3 text-center">Sistema</th>
                   <th className="py-2.5 px-3 text-center">Contado</th>
@@ -342,50 +415,47 @@ export const ContagemEstoque: React.FC<ContagemEstoqueProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {resultadoDivergencias.map((item, idx) => {
-                  const p = produtos.find((prod) => prod.id === item.estoqueId);
-                  const produtoNome = p
-                    ? getNomeProduto(p)
-                    : `ID: ${item.estoqueId}`;
-                  return (
-                    <tr
-                      key={idx}
-                      className={
-                        item.diferenca !== 0
-                          ? "bg-amber-50/50 print:bg-white"
-                          : "hover:bg-gray-50"
-                      }
-                    >
-                      <td className="py-2.5 px-3 font-medium text-gray-900">
-                        {produtoNome}
-                      </td>
-                      <td className="py-2.5 px-3 text-gray-600">
-                        {item.lote || "-"}
-                      </td>
-                      <td className="py-2.5 px-3 text-center text-gray-700">
-                        {item.qtdSistema}
-                      </td>
-                      <td className="py-2.5 px-3 text-center font-semibold text-gray-900">
-                        {item.qtdContada}
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        {item.diferenca === 0 ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-800">
-                            Igual
-                          </span>
-                        ) : item.diferenca > 0 ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800">
-                            +{item.diferenca}
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-800">
-                            {item.diferenca}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {resultadoDivergencias.map((item, idx) => (
+                  <tr
+                    key={idx}
+                    className={
+                      item.diferenca !== 0
+                        ? "bg-amber-50/50 print:bg-white"
+                        : "hover:bg-gray-50"
+                    }
+                  >
+                    <td className="py-2.5 px-3 font-medium text-gray-900">
+                      {item.produtoNome}
+                    </td>
+                    <td className="py-2.5 px-3 text-gray-600">
+                      {item.embalagemStr}
+                    </td>
+                    <td className="py-2.5 px-3 text-gray-600">
+                      {item.lote || "-"}
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-gray-700">
+                      {item.qtdSistema}
+                    </td>
+                    <td className="py-2.5 px-3 text-center font-semibold text-gray-900">
+                      {item.qtdContada}
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      {item.diferenca === 0 ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-800">
+                          Igual
+                        </span>
+                      ) : item.diferenca > 0 ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800">
+                          +{item.diferenca}
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-800">
+                          {item.diferenca}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

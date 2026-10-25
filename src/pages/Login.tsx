@@ -22,7 +22,6 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     setCarregando(true);
 
     try {
-      // Consulta direta à tabela 'usuarios' no Supabase (ignorando maiúsculas/minúsculas no e-mail)
       const { data: usuarios, error } = await supabase
         .from("usuarios")
         .select("*")
@@ -40,24 +39,17 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       const usuarioEncontrado = usuarios[0];
       const hashArmazenado = usuarioEncontrado.senha_hash;
 
-      console.log("--- DEBUG LOGIN ---");
-      console.log("E-mail encontrado:", usuarioEncontrado.email);
-      console.log("Hash armazenado:", hashArmazenado);
-      console.log("Senha digitada:", senha);
-
       if (!hashArmazenado) {
         throw new Error("Este usuário não possui uma senha configurada.");
       }
 
-      // Valida a senha comparando com o hash criptografado
+      // Validação segura da senha com bcrypt (sem logs sensíveis)
       const senhaValida = bcrypt.compareSync(senha, hashArmazenado);
-      console.log("Senha válida?", senhaValida);
 
       if (!senhaValida) {
         throw new Error("Senha incorreta.");
       }
 
-      // Armazena a sessão e os dados do usuário no localStorage
       localStorage.setItem("token", "supabase-session-token");
       localStorage.setItem("usuario", JSON.stringify(usuarioEncontrado));
 
