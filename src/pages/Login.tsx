@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { Lock, Mail, AlertCircle } from "lucide-react";
 import { supabase } from "../services/api";
+import bcrypt from "bcryptjs";
 
 const logoSrc = `${import.meta.env.BASE_URL}images/nav-logo.png`;
 
@@ -21,11 +22,11 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     setCarregando(true);
 
     try {
-      // Consulta direta à tabela 'usuarios' no Supabase
+      // Consulta direta à tabela 'usuarios' no Supabase (ignorando maiúsculas/minúsculas no e-mail)
       const { data: usuarios, error } = await supabase
         .from("usuarios")
         .select("*")
-        .eq("email", email)
+        .ilike("email", email.trim())
         .limit(1);
 
       if (error) {
@@ -37,10 +38,22 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       }
 
       const usuarioEncontrado = usuarios[0];
+      const hashArmazenado = usuarioEncontrado.senha_hash;
 
-      // Validação utilizando a coluna correta 'senha_hash'
-      const senhaArmazenada = usuarioEncontrado.senha_hash;
-      if (senhaArmazenada !== senha) {
+      console.log("--- DEBUG LOGIN ---");
+      console.log("E-mail encontrado:", usuarioEncontrado.email);
+      console.log("Hash armazenado:", hashArmazenado);
+      console.log("Senha digitada:", senha);
+
+      if (!hashArmazenado) {
+        throw new Error("Este usuário não possui uma senha configurada.");
+      }
+
+      // Valida a senha comparando com o hash criptografado
+      const senhaValida = bcrypt.compareSync(senha, hashArmazenado);
+      console.log("Senha válida?", senhaValida);
+
+      if (!senhaValida) {
         throw new Error("Senha incorreta.");
       }
 
@@ -48,7 +61,6 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       localStorage.setItem("token", "supabase-session-token");
       localStorage.setItem("usuario", JSON.stringify(usuarioEncontrado));
 
-      // Notifica o componente principal que o login foi bem-sucedido
       onLoginSuccess();
     } catch (err: any) {
       setErro(err.message || "Erro ao realizar login.");
